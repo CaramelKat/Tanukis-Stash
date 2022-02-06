@@ -32,5 +32,5 @@ The worlds first e621 client for iOS, iPadOS, and macOS built with SwiftUI
     <a href="https://i.imgur.com/E4UsFLN.jpg"><img height="300px" src="https://i.imgur.com/E4UsFLN.jpg" /></a>
 </div>
 
-This project was inspired by [The Wolf's Stash](https://zepiwolf.se/tws/), an e621 client over on the Android side, which I have missed dearly.
+This project was inspired by [The Wolf's Stash](https://zepiwolf.se/tws/), an e621 client over on the Android side.
 
