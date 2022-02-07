@@ -18,10 +18,10 @@ The worlds first e621 client for iOS, iPadOS, and macOS built with SwiftUI
 
 ## iOS Screenshots
 <div style="display:flex;">
-    <a href="https://leanpub.com/mobile-security-testing-guide"><img height="300px" src="https://i.imgur.com/pwFsajM.jpg" /></a>
-    <a href="https://leanpub.com/mobile-security-testing-guide"><img height="300px" src="https://i.imgur.com/YqQgsDI.png" /></a>
-    <a href="https://leanpub.com/mobile-security-testing-guide"><img height="300px" src="https://i.imgur.com/89TqLfZ.png" /></a>
-    <a href="https://leanpub.com/mobile-security-testing-guide"><img height="300px" src="https://i.imgur.com/6SZGlbA.jpg" /></a>
+    <a href="https://i.imgur.com/pwFsajM.jpg"><img height="300px" src="https://i.imgur.com/pwFsajM.jpg" /></a>
+    <a href="https://i.imgur.com/YqQgsDI.png"><img height="300px" src="https://i.imgur.com/YqQgsDI.png" /></a>
+    <a href="https://i.imgur.com/89TqLfZ.png"><img height="300px" src="https://i.imgur.com/89TqLfZ.png" /></a>
+    <a href="https://i.imgur.com/6SZGlbA.jpg"><img height="300px" src="https://i.imgur.com/6SZGlbA.jpg" /></a>
 </div>
 
 ## iPadOS Screenshots
