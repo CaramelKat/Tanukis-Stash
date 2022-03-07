@@ -47,44 +47,55 @@ struct PostView: View {
                                 .font(.title3)
                                 .fontWeight(.heavy)
                             ForEach(post.tags.artist, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.yellow)
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text(tag)
+                                        .font(.body)
+                                        .foregroundColor(Color.yellow)
+                                }
                             }
                             
                             Text("Character")
                                 .font(.title3)
                                 .fontWeight(.heavy)
                             ForEach(post.tags.character, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.green)
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text(tag)
+                                        .font(.body)
+                                        .foregroundColor(Color.green)
+                                }
                             }
                             
                             Text("Copyright")
                                 .font(.title3)
                                 .fontWeight(.heavy)
                             ForEach(post.tags.copyright, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.purple)
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text(tag)
+                                        .font(.body)
+                                        .foregroundColor(Color.purple)
+                                }
                             }
                             
                             Text("Species")
                                 .font(.title3)
                                 .fontWeight(.heavy)
                             ForEach(post.tags.species, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.red)
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text(tag)
+                                        .font(.body)
+                                        .foregroundColor(Color.red)
+                                }
                             }
                             
                             Text("General")
                                 .font(.title3)
                                 .fontWeight(.heavy)
                             ForEach(post.tags.general, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.body)
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text(tag)
+                                        .font(.body)
+                                        .foregroundColor(Color.white)
+                                }
                             }
                         }
                         Spacer()
