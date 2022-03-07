@@ -15,13 +15,13 @@
 		020288262783C74B00341901 /* Tanuki_s_StashUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020288252783C74B00341901 /* Tanuki_s_StashUITests.swift */; };
 		020288282783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020288272783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift */; };
 		020288352783E96600341901 /* PostModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020288342783E96600341901 /* PostModel.swift */; };
+		026C76DE27D6CC3D00BBE65A /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026C76DD27D6CC3D00BBE65A /* SearchView.swift */; };
 		027E2B302784CF9700FCEDB2 /* PostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027E2B2F2784CF9700FCEDB2 /* PostView.swift */; };
 		027E2B342784DFA200FCEDB2 /* libswift_Concurrency.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 027E2B332784DFA200FCEDB2 /* libswift_Concurrency.tbd */; settings = {ATTRIBUTES = (Weak, ); }; };
 		027E2B382784E7DC00FCEDB2 /* ImageViewer in Frameworks */ = {isa = PBXBuildFile; productRef = 027E2B372784E7DC00FCEDB2 /* ImageViewer */; };
 		027E2B3A2784E7DC00FCEDB2 /* ImageViewerRemote in Frameworks */ = {isa = PBXBuildFile; productRef = 027E2B392784E7DC00FCEDB2 /* ImageViewerRemote */; };
 		027E2B422785004600FCEDB2 /* SwiftUIGIF in Frameworks */ = {isa = PBXBuildFile; productRef = 027E2B412785004600FCEDB2 /* SwiftUIGIF */; };
 		027E2B4527850E2E00FCEDB2 /* VideoPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 027E2B4427850E2E00FCEDB2 /* VideoPlayer */; };
-		027E2B4727893E0600FCEDB2 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027E2B4627893E0600FCEDB2 /* SearchView.swift */; };
 		027E2B492789487000FCEDB2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027E2B482789486F00FCEDB2 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
@@ -54,11 +54,11 @@
 		020288252783C74B00341901 /* Tanuki_s_StashUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tanuki_s_StashUITests.swift; sourceTree = "<group>"; };
 		020288272783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tanuki_s_StashUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		020288342783E96600341901 /* PostModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostModel.swift; sourceTree = "<group>"; };
+		026C76DD27D6CC3D00BBE65A /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		027E2B2F2784CF9700FCEDB2 /* PostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostView.swift; sourceTree = "<group>"; };
 		027E2B312784DDFD00FCEDB2 /* Tanuki's Stash.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Tanuki's Stash.entitlements"; sourceTree = "<group>"; };
 		027E2B332784DFA200FCEDB2 /* libswift_Concurrency.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswift_Concurrency.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/usr/lib/swift/libswift_Concurrency.tbd; sourceTree = DEVELOPER_DIR; };
 		027E2B352784E19300FCEDB2 /* Tanuki-s-Stash-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Tanuki-s-Stash-Info.plist"; sourceTree = SOURCE_ROOT; };
-		027E2B4627893E0600FCEDB2 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		027E2B482789486F00FCEDB2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -124,8 +124,8 @@
 				020288102783C74B00341901 /* Preview Content */,
 				020288342783E96600341901 /* PostModel.swift */,
 				027E2B2F2784CF9700FCEDB2 /* PostView.swift */,
-				027E2B4627893E0600FCEDB2 /* SearchView.swift */,
 				027E2B482789486F00FCEDB2 /* SettingsView.swift */,
+				026C76DD27D6CC3D00BBE65A /* SearchView.swift */,
 			);
 			path = "Tanuki's Stash";
 			sourceTree = "<group>";
@@ -304,11 +304,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				027E2B4727893E0600FCEDB2 /* SearchView.swift in Sources */,
 				0202880D2783C74500341901 /* ContentView.swift in Sources */,
 				020288352783E96600341901 /* PostModel.swift in Sources */,
 				027E2B492789487000FCEDB2 /* SettingsView.swift in Sources */,
 				027E2B302784CF9700FCEDB2 /* PostView.swift in Sources */,
+				026C76DE27D6CC3D00BBE65A /* SearchView.swift in Sources */,
 				0202880B2783C74500341901 /* Tanuki_s_StashApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
