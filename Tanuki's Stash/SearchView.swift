@@ -12,9 +12,12 @@ struct SearchView: View {
     @State var search: String;
     @State var page = 1;
     @State var source = defaults.string(forKey: "api_source") ?? "e926.net";
-    var limit = 30;
+    @State var showSettings = false
+    
+    var limit = 75;
     var vGridLayout = [
-        GridItem(.flexible(minimum: 30)),
+        GridItem(.flexible(minimum: 75)),
+        GridItem(.flexible()),
         GridItem(.flexible())
     ]
     
@@ -30,24 +33,24 @@ struct SearchView: View {
                                         .resizable()
                                         .scaledToFill()
                                         .frame(minWidth: 0, maxWidth: .infinity)
-                                        .frame(height: 200)
+                                        .frame(width: 100, height: 100)
                                         .shadow(color: Color.primary.opacity(0.3), radius: 1)
                                 } placeholder: {
                                     ProgressView()
                                         .frame(minWidth: 0, maxWidth: .infinity)
-                                        .frame(height: 200)
+                                        .frame(width: 100, height: 100)
                                 }
                                 VStack() {
                                     Spacer()
                                     HStack(alignment: .bottom) {
                                         Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
-                                            .font(.callout)
+                                            .font(.system(size: 15))
                                             .fontWeight(.bold)
                                             .foregroundColor(Color.white)
+                                            .background(Color.gray.opacity(0.75))
+                                            .padding(5.0)
                                         Spacer()
                                     }
-                                    .padding(10.0)
-                                    .background(Color.gray.opacity(0.75))
                                 }
                             }.cornerRadius(10)
                         }
@@ -65,14 +68,14 @@ struct SearchView: View {
                     else {
                         NavigationLink(destination: PostView(post: post)) {
                             ZStack {
-                                Text("⛔️")
+                                Text("Deleted")
                                     .frame(minWidth: 0, maxWidth: .infinity)
-                                    .frame(height: 200)
+                                    .frame(width: 100, height: 100)
                                 VStack() {
                                     Spacer()
                                     HStack(alignment: .bottom) {
                                         Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
-                                            .font(.callout)
+                                            .font(.system(size: 10))
                                             .fontWeight(.bold)
                                             .foregroundColor(Color.white)
                                         Spacer()
@@ -103,12 +106,18 @@ struct SearchView: View {
             }
         }
         .navigationBarTitle("Posts", displayMode: .inline)
-        .navigationBarItems(trailing:
-            NavigationLink(destination: SettingsView()) {
-                Image(systemName: "person.crop.circle").imageScale(.large)
-            }
-        )
-        .searchable(text: $search, placement: .sidebar, prompt: "Search for tags")
+        .navigationBarItems(trailing: Button(action: {
+            self.showSettings = true
+        }) {
+            Image(systemName: "person.crop.circle").imageScale(.large)
+        })
+        .sheet(isPresented: $showSettings, content: {
+            SettingsView()
+        })
+        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search for tags") {
+            Text("Gay").searchCompletion("gay")
+            Text("Lesbian").searchCompletion("Lesbian")
+        }
         .onSubmit(of: .search) {
             Task.init {
                 page = 1;
@@ -118,8 +127,14 @@ struct SearchView: View {
     }
     
     func checkRefresh(_ id: Int) -> Bool{
-        let element = posts.last;
-        return element?.id == id;
+        if(posts.count > 25) {
+            let element = posts[posts.count - 25];
+            return element.id == id;
+        }
+        else {
+            let element = posts.last;
+            return element?.id == id;
+        }
     }
     
     func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async {
@@ -138,7 +153,7 @@ struct SearchView: View {
     func fetchMoreRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async {
         do {
             let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-            let userAgent = "Tanukis%20Stash/1.0%20(by%20JayDaBirb%20on%20e621)"
+            let userAgent = "Tanukis%20Stash/1.0%20(by%20JemTanuki%20on%20e621)"
             let url = URL(string: "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)&_client=\(userAgent)")!
             let (data, _) = try await URLSession.shared.data(from: url)
             let parsedData = try JSONDecoder().decode(Posts.self, from: data)

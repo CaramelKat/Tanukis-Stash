@@ -9,11 +9,13 @@ import SwiftUI
 import ImageViewerRemote
 import SwiftUIGIF
 import AVKit
+import Photos
 
 struct PostView: View {
     @State var showImageViewer: Bool = false;
+    @State var showSettings = false
     @State var post: PostContent;
-    @State var url: String = "";
+    @State var url: String = defaults.string(forKey: "api_source") ?? "e926.net";
     
     var body: some View {
             ScrollView(.vertical) {
@@ -165,6 +167,19 @@ struct ImageView: View {
                 if let data = imageData {
                     GIFImage(data: data)
                         .scaledToFill()
+                    Spacer()
+                    Button("Save Image") {
+                        var image: UIImage?
+                        let urlString = post.file.url
+                        
+                        let url = NSURL(string: urlString!)! as URL
+                        if let imageData: NSData = NSData(contentsOf: url) {
+                            image = UIImage(data: imageData as Data)
+                            if(image != nil) {
+                                writeToPhotoAlbum(image: image!)
+                            }
+                        }
+                    }
                 }
                 else {
                     ProgressView()
@@ -178,6 +193,12 @@ struct ImageView: View {
                 VideoPlayer(player: AVPlayer(url: URL(string: post.sample.alternates.original!.urls.last!!)!))
                     .scaledToFill()
                     .frame(minWidth: 0, maxWidth: .infinity)
+                Spacer()
+                Button("Save Video") {
+                    let urlString = post.sample.alternates.original!.urls.last!!
+                    print(urlString)
+                    downloadVideoLinkAndCreateAsset(urlString);
+                }
             }
         }
         else if(String(post.file.ext) != "gif" || String(post.file.ext) != "webm" || String(post.file.ext) != "mp4") {
@@ -194,6 +215,19 @@ struct ImageView: View {
                             .frame(minWidth: 0, maxWidth: .infinity)
                     }
                 }
+                Spacer()
+                Button("Save Image") {
+                    var image: UIImage?
+                    let urlString = post.file.url
+                    
+                    let url = NSURL(string: urlString!)! as URL
+                    if let imageData: NSData = NSData(contentsOf: url) {
+                        image = UIImage(data: imageData as Data)
+                        if(image != nil) {
+                            writeToPhotoAlbum(image: image!)
+                        }
+                    }
+                }
             }
             
         }
@@ -208,4 +242,56 @@ struct ImageView: View {
         }
         task.resume()
     }
+    
+    func writeToPhotoAlbum(image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, nil, nil)
+    }
+    
+    func downloadVideoLinkAndCreateAsset(_ videoLink: String) {
+
+            // use guard to make sure you have a valid url
+            guard let videoURL = URL(string: videoLink) else { return }
+
+            guard let documentsDirectoryURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+
+            // check if the file already exist at the destination folder if you don't want to download it twice
+            if !FileManager.default.fileExists(atPath: documentsDirectoryURL.appendingPathComponent(videoURL.lastPathComponent).path) {
+
+                // set up your download task
+                URLSession.shared.downloadTask(with: videoURL) { (location, response, error) -> Void in
+
+                    // use guard to unwrap your optional url
+                    guard let location = location else { return }
+
+                    // create a deatination url with the server response suggested file name
+                    let destinationURL = documentsDirectoryURL.appendingPathComponent(response?.suggestedFilename ?? videoURL.lastPathComponent)
+
+                    do {
+
+                        try FileManager.default.moveItem(at: location, to: destinationURL)
+
+                        PHPhotoLibrary.requestAuthorization({ (authorizationStatus: PHAuthorizationStatus) -> Void in
+
+                            // check if user authorized access photos for your app
+                            if authorizationStatus == .authorized {
+                                PHPhotoLibrary.shared().performChanges({
+                                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: destinationURL)}) { completed, error in
+                                        if completed {
+                                            print("Video asset created")
+                                        } else {
+                                            print(error)
+                                        }
+                                }
+                            }
+                        })
+
+                    } catch { print(error) }
+
+                }.resume()
+
+            } else {
+                print("File already exists at destination url")
+            }
+
+        }
 }
