@@ -23,6 +23,8 @@
 		027E2B422785004600FCEDB2 /* SwiftUIGIF in Frameworks */ = {isa = PBXBuildFile; productRef = 027E2B412785004600FCEDB2 /* SwiftUIGIF */; };
 		027E2B4527850E2E00FCEDB2 /* VideoPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 027E2B4427850E2E00FCEDB2 /* VideoPlayer */; };
 		027E2B492789487000FCEDB2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027E2B482789486F00FCEDB2 /* SettingsView.swift */; };
+		02D21B1E288279C800239990 /* TagModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1D288279C800239990 /* TagModel.swift */; };
+		02D21B2028827AA700239990 /* TagManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1F28827AA700239990 /* TagManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +62,8 @@
 		027E2B332784DFA200FCEDB2 /* libswift_Concurrency.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswift_Concurrency.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/usr/lib/swift/libswift_Concurrency.tbd; sourceTree = DEVELOPER_DIR; };
 		027E2B352784E19300FCEDB2 /* Tanuki-s-Stash-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Tanuki-s-Stash-Info.plist"; sourceTree = SOURCE_ROOT; };
 		027E2B482789486F00FCEDB2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		02D21B1D288279C800239990 /* TagModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagModel.swift; sourceTree = "<group>"; };
+		02D21B1F28827AA700239990 /* TagManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -126,6 +130,8 @@
 				027E2B2F2784CF9700FCEDB2 /* PostView.swift */,
 				027E2B482789486F00FCEDB2 /* SettingsView.swift */,
 				026C76DD27D6CC3D00BBE65A /* SearchView.swift */,
+				02D21B1D288279C800239990 /* TagModel.swift */,
+				02D21B1F28827AA700239990 /* TagManager.swift */,
 			);
 			path = "Tanuki's Stash";
 			sourceTree = "<group>";
@@ -305,6 +311,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				0202880D2783C74500341901 /* ContentView.swift in Sources */,
+				02D21B1E288279C800239990 /* TagModel.swift in Sources */,
+				02D21B2028827AA700239990 /* TagManager.swift in Sources */,
 				020288352783E96600341901 /* PostModel.swift in Sources */,
 				027E2B492789487000FCEDB2 /* SettingsView.swift in Sources */,
 				027E2B302784CF9700FCEDB2 /* PostView.swift in Sources */,
@@ -476,7 +484,6 @@
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Tanuki-s-Stash-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We want to save the loaded photo";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allows the saving of posts to the device";
@@ -514,7 +521,6 @@
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Tanuki-s-Stash-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We want to save the loaded photo";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allows the saving of posts to the device";

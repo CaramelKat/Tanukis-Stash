@@ -2,13 +2,14 @@
 //  ContentView.swift
 //  Tanuki's Stash
 //
-//  Created by Jay Poffinbarger on 1/3/22.
+//  Created by Jemma Poffinbarger on 1/3/22.
 //
 
 import SwiftUI
 
 struct SearchView: View {
     @State var posts = [PostContent]();
+    @State var searchSuggestions = [String]();
     @State var search: String;
     @State var page = 1;
     @State var source = defaults.string(forKey: "api_source") ?? "e926.net";
@@ -89,8 +90,6 @@ struct SearchView: View {
                             Task.init {
                                 if(checkRefresh(post.id)) {
                                     page += 1;
-                                    print("ayo")
-                                    print(page)
                                     await fetchMoreRecentPosts(page, limit, search);
                                 }
                             }
@@ -115,13 +114,27 @@ struct SearchView: View {
             SettingsView()
         })
         .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search for tags") {
-            Text("Gay").searchCompletion("gay")
-            Text("Lesbian").searchCompletion("Lesbian")
+        
+            ForEach(searchSuggestions, id: \.self) { tag in
+                Button(action: {
+                    updateSearch(tag);
+                }) {
+                    Text(tag);
+                }
+            }
         }
+        .onChange(of: search) { newQuery in
+            Task.init { if(search.count >= 3) {
+                Task.init {
+                    searchSuggestions = await createTagList(search);
+               }
+           } }
+                   }
         .onSubmit(of: .search) {
             Task.init {
                 page = 1;
                 await fetchRecentPosts(page, limit, search)
+                searchSuggestions.removeAll();
             }
         }
     }
@@ -135,6 +148,16 @@ struct SearchView: View {
             let element = posts.last;
             return element?.id == id;
         }
+    }
+    
+    func updateSearch(_ tag: String) {
+        if(search.contains(" ")) {
+            let index = search.lastIndex(of: " ");
+            if(index != nil) {
+                search = String(search[...index!] + " " + tag);
+            }
+        }
+        else { search = tag; }
     }
     
     func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async {
