@@ -64,6 +64,7 @@
 		027E2B482789486F00FCEDB2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		02D21B1D288279C800239990 /* TagModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagModel.swift; sourceTree = "<group>"; };
 		02D21B1F28827AA700239990 /* TagManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagManager.swift; sourceTree = "<group>"; };
+		50716C6B29A5CFA9007A3C46 /* Tanuki-s-Stash-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Tanuki-s-Stash-Info.plist"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +121,7 @@
 		020288092783C74500341901 /* Tanuki's Stash */ = {
 			isa = PBXGroup;
 			children = (
+				50716C6B29A5CFA9007A3C46 /* Tanuki-s-Stash-Info.plist */,
 				027E2B352784E19300FCEDB2 /* Tanuki-s-Stash-Info.plist */,
 				027E2B312784DDFD00FCEDB2 /* Tanuki's Stash.entitlements */,
 				0202880A2783C74500341901 /* Tanuki_s_StashApp.swift */,
@@ -484,10 +486,10 @@
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Tanuki-s-Stash-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We want to save the loaded photo";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allows the saving of posts to the device";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -521,10 +523,10 @@
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Tanuki-s-Stash-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We want to save the loaded photo";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Allows the saving of posts to the device";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

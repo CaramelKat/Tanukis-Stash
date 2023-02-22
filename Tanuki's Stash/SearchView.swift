@@ -32,7 +32,7 @@ struct SearchView: View {
                                 AsyncImage(url: URL(string: post.preview.url!)) { image in
                                     image
                                         .resizable()
-                                        .scaledToFill()
+                                        .scaledToFit()
                                         .frame(minWidth: 0, maxWidth: .infinity)
                                         .frame(width: 100, height: 100)
                                         .shadow(color: Color.primary.opacity(0.3), radius: 1)
@@ -59,8 +59,6 @@ struct SearchView: View {
                             Task.init {
                                 if(checkRefresh(post.id)) {
                                     page += 1;
-                                    print("ayo")
-                                    print(page)
                                     await fetchMoreRecentPosts(page, limit, search);
                                 }
                             }
@@ -105,6 +103,12 @@ struct SearchView: View {
             }
         }
         .navigationBarTitle("Posts", displayMode: .inline)
+        .navigationBarItems(leading: Button(action: {
+        }) {
+            NavigationLink(destination: SearchView(search: String("fav:\(defaults.string(forKey: "username") ?? "default")"))) {
+                Image(systemName: "heart").imageScale(.large)
+            }
+        })
         .navigationBarItems(trailing: Button(action: {
             self.showSettings = true
         }) {
@@ -137,6 +141,16 @@ struct SearchView: View {
                 searchSuggestions.removeAll();
             }
         }
+        .onChange(of: showSettings, perform: {showSettings in
+            if(!showSettings && (source != defaults.string(forKey: "api_source"))) {
+                source = defaults.string(forKey: "api_source") ?? "e926.net";
+                Task.init {
+                    page = 1;
+                    await fetchRecentPosts(page, limit, search)
+                    searchSuggestions.removeAll();
+                }
+            }
+        })
     }
     
     func checkRefresh(_ id: Int) -> Bool{

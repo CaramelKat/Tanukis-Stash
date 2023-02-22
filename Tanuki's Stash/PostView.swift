@@ -15,16 +15,13 @@ struct PostView: View {
     @State var showImageViewer: Bool = false;
     @State var showSettings = false
     @State var post: PostContent;
-    @State var url: String = defaults.string(forKey: "api_source") ?? "e926.net";
+    @State var url: String = "";
     
     var body: some View {
             ScrollView(.vertical) {
                 VStack {
                     ImageView(post: post);
                     Spacer();
-                    /*Button(action: { showImageViewer = true }) {
-                        
-                    }*/
                     VStack {
                         HStack {
                             Text(post.tags.artist.joined(separator: ", "));
@@ -279,7 +276,7 @@ struct ImageView: View {
                                         if completed {
                                             print("Video asset created")
                                         } else {
-                                            print(error)
+                                            print(error as Any)
                                         }
                                 }
                             }

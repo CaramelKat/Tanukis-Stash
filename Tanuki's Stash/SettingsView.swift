@@ -12,21 +12,22 @@ struct SettingsView: View {
     @Environment(\.presentationMode)
     var presentationMode: Binding<PresentationMode>
     @State private var username: String = defaults.string(forKey: "username") ?? "";
+    @State private var selection: String = defaults.string(forKey: "api_source") ?? "";
+    let sources = ["e621.net", "e926.net"];
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Images Source")) {
-                    Button(action: {
-                        defaults.set("e621.net", forKey: "api_source");
-                    }) {
-                        Text("e621.net")
-                    }
-                    Button(action: {
-                        defaults.set("e926.net", forKey: "api_source");
-                    }) {
-                        Text("e926.net")
-                    }
+                    Picker("API Source", selection: $selection) {
+                                    ForEach(sources, id: \.self) {
+                                        Text($0)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .onChange(of: selection, perform: {newValue in
+                                    defaults.set(newValue, forKey: "api_source");
+                                })
                 }
                 
                 Section(header: Text("Accounts")) {
