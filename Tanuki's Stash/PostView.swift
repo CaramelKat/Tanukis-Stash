@@ -10,140 +10,191 @@ import ImageViewerRemote
 import SwiftUIGIF
 import AVKit
 import Photos
+import AlertToast
 
 struct PostView: View {
     @State var showImageViewer: Bool = false;
-    @State var showSettings = false
+    @State var showSettings = false;
     @State var post: PostContent;
+    @State var search: String;
     @State var url: String = "";
     
     var body: some View {
-            ScrollView(.vertical) {
+        ScrollView(.vertical) {
+            VStack {
+                ImageView(post: post);
+                Spacer();
                 VStack {
-                    ImageView(post: post);
-                    Spacer();
-                    VStack {
-                        HStack {
-                            Text(post.tags.artist.joined(separator: ", "));
-                            Spacer();
+                    HStack {
+                        Text(post.tags.artist.joined(separator: ", "));
+                        Spacer();
+                    }
+                    HStack {
+                        Text("\(post.rating) #\(String(post.id)) ⬆️\(post.score.total) ❤️\(post.fav_count)")
+                        Spacer()
+                    }
+                }
+                .padding(10.0)
+                .background(Color.gray)
+                .cornerRadius(10)
+                
+                Text(.init(post.description))
+                
+                Spacer()
+                
+                HStack {
+                    VStack(alignment:.leading) {
+                        Text("Artist")
+                            .font(.title3)
+                            .fontWeight(.heavy)
+                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+
+                        ForEach(post.tags.artist, id: \.self) { tag in
+                            Menu() {
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text("New Search")
+                                }
+                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                                    Text("Add to Current Search")
+                                }
+                            } label: {
+                                Text(tag)
+                                    .font(.body)
+                                    .foregroundColor(Color.yellow)
+                            }
+                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
                         }
-                        HStack {
-                            Text("\(post.rating) #\(String(post.id)) ⬆️\(post.score.total) ❤️\(post.fav_count)")
-                            Spacer()
+                        
+                        Text("Character")
+                            .font(.title3)
+                            .fontWeight(.heavy)
+                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+                        
+                        ForEach(post.tags.character, id: \.self) { tag in
+                            Menu() {
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text("New Search")
+                                }
+                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                                    Text("Add to Current Search")
+                                }
+                            } label: {
+                                Text(tag)
+                                    .font(.body)
+                                    .foregroundColor(Color.green)
+                            }
+                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+                        }
+                        
+                        Text("Copyright")
+                            .font(.title3)
+                            .fontWeight(.heavy)
+                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+                        
+                        ForEach(post.tags.copyright, id: \.self) { tag in
+                            Menu() {
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text("New Search")
+                                }
+                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                                    Text("Add to Current Search")
+                                }
+                            } label: {
+                                Text(tag)
+                                    .font(.body)
+                                    .foregroundColor(Color.purple)
+                            }
+                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+                        }
+                        
+                        Text("Species")
+                            .font(.title3)
+                            .fontWeight(.heavy)
+                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+                        
+                        ForEach(post.tags.species, id: \.self) { tag in
+                            Menu() {
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text("New Search")
+                                }
+                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                                    Text("Add to Current Search")
+                                }
+                            } label: {
+                                Text(tag)
+                                    .font(.body)
+                                    .foregroundColor(Color.red)
+                            }
+                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+                        }
+                        
+                        Text("General")
+                            .font(.title3)
+                            .fontWeight(.heavy)
+                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+                        
+                        ForEach(post.tags.general, id: \.self) { tag in
+                            Menu() {
+                                NavigationLink(destination: SearchView(search: String(tag))) {
+                                    Text("New Search")
+                                }
+                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                                    Text("Add to Current Search")
+                                }
+                            } label: {
+                                Text(tag)
+                                    .font(.body)
+                            }
+                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
                         }
                     }
-                    .padding(10.0)
-                    .background(Color.gray)
-                    .cornerRadius(10)
-                    
-                    Text(.init(post.description))
-                    
                     Spacer()
-                    
-                    HStack {
-                        VStack(alignment:.leading) {
-                            Text("Artist")
-                                .font(.title3)
+                    VStack(alignment:.trailing) {
+                        Text("Post Details")
+                            .font(.title3)
+                            .fontWeight(.heavy)
+                        
+                        Text("Author")
+                            .font(.headline)
+                            .fontWeight(.heavy)
+                        Text(String(post.uploader_id))
+                            .font(.footnote)
+                        
+                        if(post.relationships.parent_id != nil) {
+                            Text("Parent")
+                                .font(.headline)
                                 .fontWeight(.heavy)
-                            ForEach(post.tags.artist, id: \.self) { tag in
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text(tag)
-                                        .font(.body)
-                                        .foregroundColor(Color.yellow)
-                                }
-                            }
-                            
-                            Text("Character")
-                                .font(.title3)
+                            Text(String(post.relationships.parent_id!))
+                                .font(.footnote)
+                        }
+                        
+                        if(post.relationships.has_active_children) {
+                            Text("Children")
+                                .font(.headline)
                                 .fontWeight(.heavy)
-                            ForEach(post.tags.character, id: \.self) { tag in
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text(tag)
-                                        .font(.body)
-                                        .foregroundColor(Color.green)
-                                }
+                            ForEach(post.relationships.children, id: \.self) { child in
+                                Text(String(child))
+                                    .font(.footnote)
                             }
-                            
-                            Text("Copyright")
-                                .font(.title3)
-                                .fontWeight(.heavy)
-                            ForEach(post.tags.copyright, id: \.self) { tag in
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text(tag)
-                                        .font(.body)
-                                        .foregroundColor(Color.purple)
-                                }
-                            }
-                            
-                            Text("Species")
-                                .font(.title3)
-                                .fontWeight(.heavy)
-                            ForEach(post.tags.species, id: \.self) { tag in
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text(tag)
-                                        .font(.body)
-                                        .foregroundColor(Color.red)
-                                }
-                            }
-                            
-                            Text("General")
-                                .font(.title3)
-                                .fontWeight(.heavy)
-                            ForEach(post.tags.general, id: \.self) { tag in
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text(tag)
-                                        .font(.body)
-                                        .foregroundColor(Color.white)
-                                }
-                            }
+                        }
+                        
+                        Text("Sources")
+                            .font(.headline)
+                            .fontWeight(.heavy)
+                        ForEach(post.sources, id: \.self) { tag in
+                            Text(.init(tag))
+                                .font(.footnote)
                         }
                         Spacer()
-                        VStack(alignment:.trailing) {
-                            Text("Post Details")
-                                .font(.title3)
-                                .fontWeight(.heavy)
-                            
-                            Text("Author")
-                                .font(.headline)
-                                .fontWeight(.heavy)
-                            Text(String(post.uploader_id))
-                                .font(.footnote)
-                            
-                            if(post.relationships.parent_id != nil) {
-                                Text("Parent")
-                                    .font(.headline)
-                                    .fontWeight(.heavy)
-                                Text(String(post.relationships.parent_id!))
-                                    .font(.footnote)
-                            }
-                            
-                            if(post.relationships.has_active_children) {
-                                Text("Children")
-                                    .font(.headline)
-                                    .fontWeight(.heavy)
-                                ForEach(post.relationships.children, id: \.self) { child in
-                                    Text(String(child))
-                                        .font(.footnote)
-                                }
-                            }
-                            
-                            Text("Sources")
-                                .font(.headline)
-                                .fontWeight(.heavy)
-                            ForEach(post.sources, id: \.self) { tag in
-                                Text(.init(tag))
-                                    .font(.footnote)
-                            }
-                            Spacer()
-                        }
                     }
-                    Spacer()
-                    Spacer()
                 }
-                .padding(10)
+                Spacer()
+                Spacer()
             }
-            .navigationBarTitle("Post", displayMode: .inline)
-            .overlay(ImageViewerRemote(imageURL: self.$url, viewerShown: self.$showImageViewer))
+            .padding(10)
+        }
+        .navigationBarTitle("Post", displayMode: .inline)
+        .overlay(ImageViewerRemote(imageURL: self.$url, viewerShown: self.$showImageViewer))
     }
 }
 
@@ -154,6 +205,8 @@ struct ImageView: View {
     @State private var imageData: Data? = nil
     @State private var mute: Bool = false
     @State private var play: Bool = true
+    @State private var showToast: Bool = false
+    @State private var showLoadingToast: Bool = false
     
     var body: some View {
         if(post.preview.url == nil) {
@@ -164,16 +217,29 @@ struct ImageView: View {
                 if let data = imageData {
                     GIFImage(data: data)
                         .scaledToFill()
+                        .toast(isPresenting: $showToast){
+                            AlertToast(type: .complete(Color.green), title: "Saved GIF!")
+                        }
+                        .toast(isPresenting: $showLoadingToast){
+                            AlertToast(type: .loading, title: "Saving GIF...")
+                        }
                     Spacer()
                     Button("Save Image") {
+                        showLoadingToast.toggle()
                         var image: UIImage?
                         let urlString = post.file.url
                         
-                        let url = NSURL(string: urlString!)! as URL
-                        if let imageData: NSData = NSData(contentsOf: url) {
-                            image = UIImage(data: imageData as Data)
-                            if(image != nil) {
-                                writeToPhotoAlbum(image: image!)
+                        let url = URL(string: urlString!)
+
+                        DispatchQueue.global().async {
+                            let data = try? Data(contentsOf: url!) //make sure your image in this url does exist, otherwise unwrap in a if let check / try-catch
+                            DispatchQueue.main.async {
+                                image = UIImage(data: data!)
+                                if(image != nil) {
+                                    writeToPhotoAlbum(image: image!)
+                                    showLoadingToast.toggle()
+                                    showToast.toggle()
+                                }
                             }
                         }
                     }
@@ -190,11 +256,18 @@ struct ImageView: View {
                 VideoPlayer(player: AVPlayer(url: URL(string: post.sample.alternates.original!.urls.last!!)!))
                     .scaledToFill()
                     .frame(minWidth: 0, maxWidth: .infinity)
+                    .toast(isPresenting: $showToast){
+                        AlertToast(type: .complete(Color.green), title: "Saved Video!")
+                    }
+                    .toast(isPresenting: $showLoadingToast){
+                        AlertToast(type: .loading, title: "Saving Video...")
+                    }
                 Spacer()
                 Button("Save Video") {
+                    showLoadingToast.toggle()
                     let urlString = post.sample.alternates.original!.urls.last!!
-                    print(urlString)
                     downloadVideoLinkAndCreateAsset(urlString);
+                    showToast.toggle()
                 }
             }
         }
@@ -205,6 +278,12 @@ struct ImageView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(minWidth: 0, maxWidth: .infinity)
+                        .toast(isPresenting: $showToast){
+                            AlertToast(type: .complete(Color.green), title: "Saved Image!")
+                        }
+                        .toast(isPresenting: $showLoadingToast){
+                            AlertToast(type: .loading, title: "Saving Image...")
+                        }
                 } placeholder: {
                     ZStack {
                         AsyncImage(url: URL(string: post.preview.url!)).opacity(0.25)
@@ -214,14 +293,21 @@ struct ImageView: View {
                 }
                 Spacer()
                 Button("Save Image") {
+                    showLoadingToast.toggle()
                     var image: UIImage?
                     let urlString = post.file.url
                     
-                    let url = NSURL(string: urlString!)! as URL
-                    if let imageData: NSData = NSData(contentsOf: url) {
-                        image = UIImage(data: imageData as Data)
-                        if(image != nil) {
-                            writeToPhotoAlbum(image: image!)
+                    let url = URL(string: urlString!)
+
+                    DispatchQueue.global().async {
+                        let data = try? Data(contentsOf: url!) //make sure your image in this url does exist, otherwise unwrap in a if let check / try-catch
+                        DispatchQueue.main.async {
+                            image = UIImage(data: data!)
+                            if(image != nil) {
+                                writeToPhotoAlbum(image: image!)
+                                showLoadingToast.toggle()
+                                showToast.toggle()
+                            }
                         }
                     }
                 }

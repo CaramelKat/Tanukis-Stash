@@ -27,33 +27,35 @@ struct SearchView: View {
             LazyVGrid(columns: vGridLayout) {
                 ForEach(posts, id: \.id) { post in
                     if(post.preview.url != nil) {
-                        NavigationLink(destination: PostView(post: post)) {
+                        NavigationLink(destination: PostView(post: post, search: search)) {
                             ZStack {
                                 AsyncImage(url: URL(string: post.preview.url!)) { image in
                                     image
                                         .resizable()
-                                        .scaledToFit()
+                                        .scaledToFill()
+                                        .clipped()
                                         .frame(minWidth: 0, maxWidth: .infinity)
-                                        .frame(width: 100, height: 100)
+                                        .frame(height: 150)
                                         .shadow(color: Color.primary.opacity(0.3), radius: 1)
                                 } placeholder: {
                                     ProgressView()
                                         .frame(minWidth: 0, maxWidth: .infinity)
-                                        .frame(width: 100, height: 100)
+                                        .frame(width: 100, height: 150)
                                 }
                                 VStack() {
                                     Spacer()
                                     HStack(alignment: .bottom) {
                                         Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
-                                            .font(.system(size: 15))
+                                            .font(.system(size: 12))
                                             .fontWeight(.bold)
                                             .foregroundColor(Color.white)
-                                            .background(Color.gray.opacity(0.75))
-                                            .padding(5.0)
                                         Spacer()
                                     }
+                                    .padding(5.0)
+                                    .background(Color.gray.opacity(0.50))
                                 }
                             }.cornerRadius(10)
+                            .padding(0.1)
                         }
                         .onAppear {
                             Task.init {
@@ -65,24 +67,26 @@ struct SearchView: View {
                         }
                     }
                     else {
-                        NavigationLink(destination: PostView(post: post)) {
+                        NavigationLink(destination: PostView(post: post, search: search)) {
                             ZStack {
                                 Text("Deleted")
                                     .frame(minWidth: 0, maxWidth: .infinity)
-                                    .frame(width: 100, height: 100)
+                                    .frame(width: .infinity, height: 150)
+                                    .background(Color.gray.opacity(0.90))
                                 VStack() {
                                     Spacer()
                                     HStack(alignment: .bottom) {
                                         Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
-                                            .font(.system(size: 10))
+                                            .font(.system(size: 12))
                                             .fontWeight(.bold)
                                             .foregroundColor(Color.white)
                                         Spacer()
                                     }
-                                    .padding(10.0)
-                                    .background(Color.gray.opacity(0.75))
+                                    .padding(5.0)
+                                    .background(Color.gray.opacity(0.50))
                                 }
-                            }
+                            }.cornerRadius(10)
+                                .padding(0.1)
                         }
                         .onAppear {
                             Task.init {
@@ -151,6 +155,15 @@ struct SearchView: View {
                 }
             }
         })
+        .refreshable {
+            page = 1;
+            await fetchRecentPosts(page, limit, search)
+        }
+    }
+    
+    func refreshData() async {
+        // do work to asyncronously refresh your data here
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
     }
     
     func checkRefresh(_ id: Int) -> Bool{
@@ -168,7 +181,7 @@ struct SearchView: View {
         if(search.contains(" ")) {
             let index = search.lastIndex(of: " ");
             if(index != nil) {
-                search = String(search[...index!] + " " + tag);
+                search = String(search[...index!].trimmingCharacters(in: .whitespaces) + " " + tag);
             }
         }
         else { search = tag; }

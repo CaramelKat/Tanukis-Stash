@@ -11,7 +11,7 @@ let defaults = UserDefaults.standard
 struct ContentView: View {
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             SearchView(search: "");
         }
     }
