@@ -2,7 +2,7 @@
 //  PostView.swift
 //  Tanuki's Stash
 //
-//  Created by Jay Poffinbarger on 1/4/22.
+//  Created by Jemma Poffinbarger on 1/4/22.
 //
 
 import SwiftUI
@@ -11,6 +11,7 @@ import SwiftUIGIF
 import AVKit
 import Photos
 import AlertToast
+import AttributedText
 
 struct PostView: View {
     @State var showImageViewer: Bool = false;
@@ -18,11 +19,40 @@ struct PostView: View {
     @State var post: PostContent;
     @State var search: String;
     @State var url: String = "";
+    @State private var parentPost: PostContent?;
     
     var body: some View {
         ScrollView(.vertical) {
             VStack {
                 ImageView(post: post);
+                HStack {
+                    if((post.relationships.parent_id) != nil) {
+                        NavigationLink(destination: PostView(post: parentPost ?? post, search: search)) {
+                            Text("Parent")
+                                .foregroundColor(Color.red)
+                                .font(.headline)
+                        }
+                        .task {
+                            await fetchRecentPosts(postID: post.relationships.parent_id!);
+                        }
+                        Spacer()
+                    }
+                    if(post.relationships.has_active_children) {
+                        NavigationLink(destination: SearchView(search: "parent:" + String(post.id))) {
+                            Text("Children")
+                                .foregroundColor(Color.red)
+                                .font(.headline)
+                        }
+                    }
+                    if(post.pools.count > 0) {
+                        Spacer()
+                        NavigationLink(destination: SearchView(search: "pool:" + String(post.pools[0]))) {
+                            Text("Pool")
+                                .foregroundColor(Color.green)
+                                .font(.headline)
+                        }
+                    }
+                }
                 Spacer();
                 VStack {
                     HStack {
@@ -38,116 +68,16 @@ struct PostView: View {
                 .background(Color.gray)
                 .cornerRadius(10)
                 
-                Text(.init(post.description))
+                
+                VStack(alignment: .leading) {
+                    AttributedText(descParser(text: .init(post.description)))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 
                 Spacer()
                 
                 HStack {
-                    VStack(alignment:.leading) {
-                        Text("Artist")
-                            .font(.title3)
-                            .fontWeight(.heavy)
-                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-
-                        ForEach(post.tags.artist, id: \.self) { tag in
-                            Menu() {
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text("New Search")
-                                }
-                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                                    Text("Add to Current Search")
-                                }
-                            } label: {
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.yellow)
-                            }
-                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-                        }
-                        
-                        Text("Character")
-                            .font(.title3)
-                            .fontWeight(.heavy)
-                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-                        
-                        ForEach(post.tags.character, id: \.self) { tag in
-                            Menu() {
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text("New Search")
-                                }
-                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                                    Text("Add to Current Search")
-                                }
-                            } label: {
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.green)
-                            }
-                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-                        }
-                        
-                        Text("Copyright")
-                            .font(.title3)
-                            .fontWeight(.heavy)
-                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-                        
-                        ForEach(post.tags.copyright, id: \.self) { tag in
-                            Menu() {
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text("New Search")
-                                }
-                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                                    Text("Add to Current Search")
-                                }
-                            } label: {
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.purple)
-                            }
-                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-                        }
-                        
-                        Text("Species")
-                            .font(.title3)
-                            .fontWeight(.heavy)
-                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-                        
-                        ForEach(post.tags.species, id: \.self) { tag in
-                            Menu() {
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text("New Search")
-                                }
-                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                                    Text("Add to Current Search")
-                                }
-                            } label: {
-                                Text(tag)
-                                    .font(.body)
-                                    .foregroundColor(Color.red)
-                            }
-                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-                        }
-                        
-                        Text("General")
-                            .font(.title3)
-                            .fontWeight(.heavy)
-                            .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-                        
-                        ForEach(post.tags.general, id: \.self) { tag in
-                            Menu() {
-                                NavigationLink(destination: SearchView(search: String(tag))) {
-                                    Text("New Search")
-                                }
-                                NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                                    Text("Add to Current Search")
-                                }
-                            } label: {
-                                Text(tag)
-                                    .font(.body)
-                            }
-                            .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-                        }
-                    }
+                    postTags(post: post, search: search)
                     Spacer()
                     VStack(alignment:.trailing) {
                         Text("Post Details")
@@ -167,17 +97,6 @@ struct PostView: View {
                             Text(String(post.relationships.parent_id!))
                                 .font(.footnote)
                         }
-                        
-                        if(post.relationships.has_active_children) {
-                            Text("Children")
-                                .font(.headline)
-                                .fontWeight(.heavy)
-                            ForEach(post.relationships.children, id: \.self) { child in
-                                Text(String(child))
-                                    .font(.footnote)
-                            }
-                        }
-                        
                         Text("Sources")
                             .font(.headline)
                             .fontWeight(.heavy)
@@ -196,8 +115,131 @@ struct PostView: View {
         .navigationBarTitle("Post", displayMode: .inline)
         .overlay(ImageViewerRemote(imageURL: self.$url, viewerShown: self.$showImageViewer))
     }
+    func fetchRecentPosts(postID: Int) async {
+        do {
+            let userAgent = "Tanukis%20Stash/1.0%20(by%20JayDaBirb%20on%20e621)"
+            let url = URL(string: "https://\(source)/posts/\(postID).json?_client=\(userAgent)")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let parsedData = try JSONDecoder().decode(Post.self, from: data)
+            parentPost = parsedData.post;
+        } catch {
+            print(error);
+        }
+    }
 }
 
+struct postTags: View {
+    @State var post: PostContent;
+    @State var search: String;
+    
+    var body: some View {
+        VStack(alignment:.leading) {
+            Text("Artist")
+                .font(.title3)
+                .fontWeight(.heavy)
+                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+
+            ForEach(post.tags.artist, id: \.self) { tag in
+                Menu() {
+                    NavigationLink(destination: SearchView(search: String(tag))) {
+                        Text("New Search")
+                    }
+                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                        Text("Add to Current Search")
+                    }
+                } label: {
+                    Text(tag)
+                        .font(.body)
+                        .foregroundColor(Color.yellow)
+                }
+                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+            }
+            
+            Text("Character")
+                .font(.title3)
+                .fontWeight(.heavy)
+                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+            
+            ForEach(post.tags.character, id: \.self) { tag in
+                Menu() {
+                    NavigationLink(destination: SearchView(search: String(tag))) {
+                        Text("New Search")
+                    }
+                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                        Text("Add to Current Search")
+                    }
+                } label: {
+                    Text(tag)
+                        .font(.body)
+                        .foregroundColor(Color.green)
+                }
+                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+            }
+            
+            Text("Copyright")
+                .font(.title3)
+                .fontWeight(.heavy)
+                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+            
+            ForEach(post.tags.copyright, id: \.self) { tag in
+                Menu() {
+                    NavigationLink(destination: SearchView(search: String(tag))) {
+                        Text("New Search")
+                    }
+                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                        Text("Add to Current Search")
+                    }
+                } label: {
+                    Text(tag)
+                        .font(.body)
+                        .foregroundColor(Color.purple)
+                }
+                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+            }
+            
+            Text("Species")
+                .font(.title3)
+                .fontWeight(.heavy)
+                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+            
+            ForEach(post.tags.species, id: \.self) { tag in
+                Menu() {
+                    NavigationLink(destination: SearchView(search: String(tag))) {
+                        Text("New Search")
+                    }
+                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                        Text("Add to Current Search")
+                    }
+                } label: {
+                    Text(tag)
+                        .font(.body)
+                        .foregroundColor(Color.red)
+                }
+                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+            }
+            
+            Text("General")
+                .font(.title3)
+                .fontWeight(.heavy)
+                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+            
+            ForEach(post.tags.general, id: \.self) { tag in
+                Menu() {
+                    NavigationLink(destination: SearchView(search: String(tag))) {
+                        Text("New Search")
+                    }
+                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                        Text("Add to Current Search")
+                    }
+                } label: {
+                    Text(tag)
+                        .font(.body)
+                }
+                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+            }
+        }
+    }
+}
 
 struct ImageView: View {
     
@@ -377,4 +419,14 @@ struct ImageView: View {
             }
 
         }
+}
+
+func descParser(text: String)-> String {
+    var newText = text.replacingOccurrences(of: "[b]", with: "<b>");
+    newText = newText.replacingOccurrences(of: "[/b]", with: "</b>");
+    newText = newText.replacingOccurrences(of: "[u]", with: "<u>");
+    newText = newText.replacingOccurrences(of: "[/u]", with: "</u>");
+    newText = newText.replacingOccurrences(of: "[quote]", with: "\"");
+    newText = newText.replacingOccurrences(of: "[/quote]", with: "\"");
+    return newText;
 }

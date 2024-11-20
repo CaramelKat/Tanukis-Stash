@@ -11,9 +11,6 @@
 		0202880D2783C74500341901 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0202880C2783C74500341901 /* ContentView.swift */; };
 		0202880F2783C74B00341901 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0202880E2783C74B00341901 /* Assets.xcassets */; };
 		020288122783C74B00341901 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 020288112783C74B00341901 /* Preview Assets.xcassets */; };
-		0202881C2783C74B00341901 /* Tanuki_s_StashTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0202881B2783C74B00341901 /* Tanuki_s_StashTests.swift */; };
-		020288262783C74B00341901 /* Tanuki_s_StashUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020288252783C74B00341901 /* Tanuki_s_StashUITests.swift */; };
-		020288282783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020288272783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift */; };
 		020288352783E96600341901 /* PostModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020288342783E96600341901 /* PostModel.swift */; };
 		026C76DE27D6CC3D00BBE65A /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026C76DD27D6CC3D00BBE65A /* SearchView.swift */; };
 		027E2B302784CF9700FCEDB2 /* PostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027E2B2F2784CF9700FCEDB2 /* PostView.swift */; };
@@ -25,6 +22,7 @@
 		027E2B492789487000FCEDB2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027E2B482789486F00FCEDB2 /* SettingsView.swift */; };
 		02D21B1E288279C800239990 /* TagModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1D288279C800239990 /* TagModel.swift */; };
 		02D21B2028827AA700239990 /* TagManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1F28827AA700239990 /* TagManager.swift */; };
+		50914FA92C26652000E52BD0 /* AttributedText in Frameworks */ = {isa = PBXBuildFile; productRef = 50914FA82C26652000E52BD0 /* AttributedText */; };
 		50C1182B2B648B18003F5D4E /* AlertToast in Frameworks */ = {isa = PBXBuildFile; productRef = 50C1182A2B648B18003F5D4E /* AlertToast */; };
 /* End PBXBuildFile section */
 
@@ -52,13 +50,10 @@
 		0202880E2783C74B00341901 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		020288112783C74B00341901 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		020288172783C74B00341901 /* Tanuki's StashTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Tanuki's StashTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		0202881B2783C74B00341901 /* Tanuki_s_StashTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tanuki_s_StashTests.swift; sourceTree = "<group>"; };
 		020288212783C74B00341901 /* Tanuki's StashUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Tanuki's StashUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		020288252783C74B00341901 /* Tanuki_s_StashUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tanuki_s_StashUITests.swift; sourceTree = "<group>"; };
-		020288272783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tanuki_s_StashUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		020288342783E96600341901 /* PostModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostModel.swift; sourceTree = "<group>"; };
 		026C76DD27D6CC3D00BBE65A /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
-		027E2B2F2784CF9700FCEDB2 /* PostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostView.swift; sourceTree = "<group>"; };
+		027E2B2F2784CF9700FCEDB2 /* PostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostView.swift; sourceTree = "<group>"; usesTabs = 0; };
 		027E2B312784DDFD00FCEDB2 /* Tanuki's Stash.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Tanuki's Stash.entitlements"; sourceTree = "<group>"; };
 		027E2B332784DFA200FCEDB2 /* libswift_Concurrency.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswift_Concurrency.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/usr/lib/swift/libswift_Concurrency.tbd; sourceTree = DEVELOPER_DIR; };
 		027E2B482789486F00FCEDB2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -77,6 +72,7 @@
 				50C1182B2B648B18003F5D4E /* AlertToast in Frameworks */,
 				027E2B3A2784E7DC00FCEDB2 /* ImageViewerRemote in Frameworks */,
 				027E2B4527850E2E00FCEDB2 /* VideoPlayer in Frameworks */,
+				50914FA92C26652000E52BD0 /* AttributedText in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -101,8 +97,6 @@
 			isa = PBXGroup;
 			children = (
 				020288092783C74500341901 /* Tanuki's Stash */,
-				0202881A2783C74B00341901 /* Tanuki's StashTests */,
-				020288242783C74B00341901 /* Tanuki's StashUITests */,
 				020288082783C74500341901 /* Products */,
 				027E2B322784DFA100FCEDB2 /* Frameworks */,
 			);
@@ -144,23 +138,6 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		0202881A2783C74B00341901 /* Tanuki's StashTests */ = {
-			isa = PBXGroup;
-			children = (
-				0202881B2783C74B00341901 /* Tanuki_s_StashTests.swift */,
-			);
-			path = "Tanuki's StashTests";
-			sourceTree = "<group>";
-		};
-		020288242783C74B00341901 /* Tanuki's StashUITests */ = {
-			isa = PBXGroup;
-			children = (
-				020288252783C74B00341901 /* Tanuki_s_StashUITests.swift */,
-				020288272783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift */,
-			);
-			path = "Tanuki's StashUITests";
-			sourceTree = "<group>";
-		};
 		027E2B322784DFA100FCEDB2 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -191,6 +168,7 @@
 				027E2B412785004600FCEDB2 /* SwiftUIGIF */,
 				027E2B4427850E2E00FCEDB2 /* VideoPlayer */,
 				50C1182A2B648B18003F5D4E /* AlertToast */,
+				50914FA82C26652000E52BD0 /* AttributedText */,
 			);
 			productName = "Tanuki's Stash";
 			productReference = 020288072783C74500341901 /* Tanuki's Stash.app */;
@@ -269,6 +247,7 @@
 				027E2B402785004600FCEDB2 /* XCRemoteSwiftPackageReference "swiftui-gif" */,
 				027E2B4327850E2E00FCEDB2 /* XCRemoteSwiftPackageReference "VideoPlayer" */,
 				50C118292B648B18003F5D4E /* XCRemoteSwiftPackageReference "AlertToast" */,
+				50914FA72C26652000E52BD0 /* XCRemoteSwiftPackageReference "AttributedText" */,
 			);
 			productRefGroup = 020288082783C74500341901 /* Products */;
 			projectDirPath = "";
@@ -327,7 +306,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0202881C2783C74B00341901 /* Tanuki_s_StashTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -335,8 +313,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				020288282783C74B00341901 /* Tanuki_s_StashUITestsLaunchTests.swift in Sources */,
-				020288262783C74B00341901 /* Tanuki_s_StashUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -502,10 +478,11 @@
 				MARKETING_VERSION = 0.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.jemsoftware.tanukistash;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTS_MACCATALYST = YES;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,3";
 			};
 			name = Debug;
 		};
@@ -539,10 +516,11 @@
 				MARKETING_VERSION = 0.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.jemsoftware.tanukistash;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTS_MACCATALYST = YES;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = "1,2,3";
 			};
 			name = Release;
 		};
@@ -688,6 +666,14 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		50914FA72C26652000E52BD0 /* XCRemoteSwiftPackageReference "AttributedText" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Iaenhaall/AttributedText.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.0;
+			};
+		};
 		50C118292B648B18003F5D4E /* XCRemoteSwiftPackageReference "AlertToast" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/elai950/AlertToast.git";
@@ -718,6 +704,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 027E2B4327850E2E00FCEDB2 /* XCRemoteSwiftPackageReference "VideoPlayer" */;
 			productName = VideoPlayer;
+		};
+		50914FA82C26652000E52BD0 /* AttributedText */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50914FA72C26652000E52BD0 /* XCRemoteSwiftPackageReference "AttributedText" */;
+			productName = AttributedText;
 		};
 		50C1182A2B648B18003F5D4E /* AlertToast */ = {
 			isa = XCSwiftPackageProductDependency;

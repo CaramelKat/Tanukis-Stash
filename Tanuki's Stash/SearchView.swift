@@ -71,7 +71,7 @@ struct SearchView: View {
                             ZStack {
                                 Text("Deleted")
                                     .frame(minWidth: 0, maxWidth: .infinity)
-                                    .frame(width: .infinity, height: 150)
+                                    .frame(height: 150)
                                     .background(Color.gray.opacity(0.90))
                                 VStack() {
                                     Spacer()
@@ -107,13 +107,13 @@ struct SearchView: View {
             }
         }
         .navigationBarTitle("Posts", displayMode: .inline)
-        .navigationBarItems(leading: Button(action: {
+        .navigationBarItems(trailing: Button(action: {
         }) {
             NavigationLink(destination: SearchView(search: String("fav:\(defaults.string(forKey: "username") ?? "default")"))) {
                 Image(systemName: "heart").imageScale(.large)
             }
         })
-        .navigationBarItems(trailing: Button(action: {
+        .navigationBarItems(leading: Button(action: {
             self.showSettings = true
         }) {
             Image(systemName: "person.crop.circle").imageScale(.large)
@@ -122,14 +122,15 @@ struct SearchView: View {
             SettingsView()
         })
         .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search for tags") {
-        
-            ForEach(searchSuggestions, id: \.self) { tag in
-                Button(action: {
-                    updateSearch(tag);
-                }) {
-                    Text(tag);
+            //List {
+                ForEach(searchSuggestions, id: \.self) { tag in
+                    Button(action: {
+                        updateSearch(tag);
+                    }) {
+                        Text(tag);
+                    }
                 }
-            }
+            //}
         }
         .onChange(of: search) { newQuery in
             Task.init { if(search.count >= 3) {
@@ -190,7 +191,7 @@ struct SearchView: View {
     func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async {
         do {
             let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-            let userAgent = "Tanukis%20Stash/1.0%20(by%20JayDaBirb%20on%20e621)"
+            let userAgent = "Tanukis%20Stash/1.0%20(by%20JemTanuki%20on%20e621)"
             let url = URL(string: "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)&_client=\(userAgent)")!
             let (data, _) = try await URLSession.shared.data(from: url)
             let parsedData = try JSONDecoder().decode(Posts.self, from: data)
