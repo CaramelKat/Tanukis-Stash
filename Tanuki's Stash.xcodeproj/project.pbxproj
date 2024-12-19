@@ -21,7 +21,7 @@
 		027E2B4527850E2E00FCEDB2 /* VideoPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 027E2B4427850E2E00FCEDB2 /* VideoPlayer */; };
 		027E2B492789487000FCEDB2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027E2B482789486F00FCEDB2 /* SettingsView.swift */; };
 		02D21B1E288279C800239990 /* TagModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1D288279C800239990 /* TagModel.swift */; };
-		02D21B2028827AA700239990 /* TagManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1F28827AA700239990 /* TagManager.swift */; };
+		02D21B2028827AA700239990 /* ApiManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1F28827AA700239990 /* ApiManager.swift */; };
 		50914FA92C26652000E52BD0 /* AttributedText in Frameworks */ = {isa = PBXBuildFile; productRef = 50914FA82C26652000E52BD0 /* AttributedText */; };
 		50C1182B2B648B18003F5D4E /* AlertToast in Frameworks */ = {isa = PBXBuildFile; productRef = 50C1182A2B648B18003F5D4E /* AlertToast */; };
 /* End PBXBuildFile section */
@@ -58,7 +58,7 @@
 		027E2B332784DFA200FCEDB2 /* libswift_Concurrency.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswift_Concurrency.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/usr/lib/swift/libswift_Concurrency.tbd; sourceTree = DEVELOPER_DIR; };
 		027E2B482789486F00FCEDB2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		02D21B1D288279C800239990 /* TagModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagModel.swift; sourceTree = "<group>"; };
-		02D21B1F28827AA700239990 /* TagManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagManager.swift; sourceTree = "<group>"; };
+		02D21B1F28827AA700239990 /* ApiManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,7 +125,7 @@
 				027E2B482789486F00FCEDB2 /* SettingsView.swift */,
 				026C76DD27D6CC3D00BBE65A /* SearchView.swift */,
 				02D21B1D288279C800239990 /* TagModel.swift */,
-				02D21B1F28827AA700239990 /* TagManager.swift */,
+				02D21B1F28827AA700239990 /* ApiManager.swift */,
 			);
 			path = "Tanuki's Stash";
 			sourceTree = "<group>";
@@ -293,7 +293,7 @@
 			files = (
 				0202880D2783C74500341901 /* ContentView.swift in Sources */,
 				02D21B1E288279C800239990 /* TagModel.swift in Sources */,
-				02D21B2028827AA700239990 /* TagManager.swift in Sources */,
+				02D21B2028827AA700239990 /* ApiManager.swift in Sources */,
 				020288352783E96600341901 /* PostModel.swift in Sources */,
 				027E2B492789487000FCEDB2 /* SettingsView.swift in Sources */,
 				027E2B302784CF9700FCEDB2 /* PostView.swift in Sources */,
@@ -456,7 +456,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tanuki's Stash/Tanuki's Stash.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"Tanuki's Stash/Preview Content\"";
 				DEVELOPMENT_TEAM = 8Y8A9FZ38R;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
@@ -475,7 +475,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.jemsoftware.tanukistash;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";
@@ -494,7 +494,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Tanuki's Stash/Tanuki's Stash.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"Tanuki's Stash/Preview Content\"";
 				DEVELOPMENT_TEAM = 8Y8A9FZ38R;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
@@ -513,7 +513,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.jemsoftware.tanukistash;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";

@@ -29,7 +29,7 @@ struct PostContent: Decodable {
     let uploader_id: Int;
     let description: String;
     let comment_count: Int;
-    let is_favorited: Bool;
+    var is_favorited: Bool;
     let has_notes: Bool;
     let duration: Float?;
 }

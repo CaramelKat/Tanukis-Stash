@@ -26,84 +26,22 @@ struct SearchView: View {
         ScrollView(.vertical) {
             LazyVGrid(columns: vGridLayout) {
                 ForEach(posts, id: \.id) { post in
-                    if(post.preview.url != nil) {
-                        NavigationLink(destination: PostView(post: post, search: search)) {
-                            ZStack {
-                                AsyncImage(url: URL(string: post.preview.url!)) { image in
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                        .clipped()
-                                        .frame(minWidth: 0, maxWidth: .infinity)
-                                        .frame(height: 150)
-                                        .shadow(color: Color.primary.opacity(0.3), radius: 1)
-                                } placeholder: {
-                                    ProgressView()
-                                        .frame(minWidth: 0, maxWidth: .infinity)
-                                        .frame(width: 100, height: 150)
-                                }
-                                VStack() {
-                                    Spacer()
-                                    HStack(alignment: .bottom) {
-                                        Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
-                                            .font(.system(size: 12))
-                                            .fontWeight(.bold)
-                                            .foregroundColor(Color.white)
-                                        Spacer()
-                                    }
-                                    .padding(5.0)
-                                    .background(Color.gray.opacity(0.50))
-                                }
-                            }.cornerRadius(10)
-                            .padding(0.1)
-                        }
+                    PostPreviewFrame(post: post, search: search)
                         .onAppear {
                             Task.init {
                                 if(checkRefresh(post.id)) {
                                     page += 1;
-                                    await fetchMoreRecentPosts(page, limit, search);
+                                    posts += await fetchMoreRecentPosts(page, limit, search);
                                 }
                             }
                         }
-                    }
-                    else {
-                        NavigationLink(destination: PostView(post: post, search: search)) {
-                            ZStack {
-                                Text("Deleted")
-                                    .frame(minWidth: 0, maxWidth: .infinity)
-                                    .frame(height: 150)
-                                    .background(Color.gray.opacity(0.90))
-                                VStack() {
-                                    Spacer()
-                                    HStack(alignment: .bottom) {
-                                        Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
-                                            .font(.system(size: 12))
-                                            .fontWeight(.bold)
-                                            .foregroundColor(Color.white)
-                                        Spacer()
-                                    }
-                                    .padding(5.0)
-                                    .background(Color.gray.opacity(0.50))
-                                }
-                            }.cornerRadius(10)
-                                .padding(0.1)
-                        }
-                        .onAppear {
-                            Task.init {
-                                if(checkRefresh(post.id)) {
-                                    page += 1;
-                                    await fetchMoreRecentPosts(page, limit, search);
-                                }
-                            }
-                        }
-                    }
                 }
             }
             .padding(10)
         }.task {
             source = defaults.string(forKey: "api_source") ?? "e621.net";
             if($posts.count == 0) {
-                await fetchRecentPosts(1, 28, search)
+                posts = await fetchRecentPosts(1, 28, search)
             }
         }
         .navigationBarTitle("Posts", displayMode: .inline)
@@ -140,31 +78,28 @@ struct SearchView: View {
            } }
                    }
         .onSubmit(of: .search) {
+            posts = [];
             Task.init {
                 page = 1;
-                await fetchRecentPosts(page, limit, search)
+                posts = await fetchRecentPosts(page, limit, search)
                 searchSuggestions.removeAll();
             }
         }
         .onChange(of: showSettings, perform: {showSettings in
             if(!showSettings && (source != defaults.string(forKey: "api_source"))) {
                 source = defaults.string(forKey: "api_source") ?? "e926.net";
+                posts = [];
                 Task.init {
                     page = 1;
-                    await fetchRecentPosts(page, limit, search)
+                    posts = await fetchRecentPosts(page, limit, search)
                     searchSuggestions.removeAll();
                 }
             }
         })
         .refreshable {
             page = 1;
-            await fetchRecentPosts(page, limit, search)
+            posts = await fetchRecentPosts(page, limit, search)
         }
-    }
-    
-    func refreshData() async {
-        // do work to asyncronously refresh your data here
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
     }
     
     func checkRefresh(_ id: Int) -> Bool{
@@ -187,36 +122,57 @@ struct SearchView: View {
         }
         else { search = tag; }
     }
-    
-    func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async {
-        do {
-            let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-            let userAgent = "Tanukis%20Stash/1.0%20(by%20JemTanuki%20on%20e621)"
-            let url = URL(string: "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)&_client=\(userAgent)")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let parsedData = try JSONDecoder().decode(Posts.self, from: data)
-            posts = parsedData.posts;
-        } catch {
-            print(error);
-        }
-    }
-    
-    func fetchMoreRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async {
-        do {
-            let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-            let userAgent = "Tanukis%20Stash/1.0%20(by%20JemTanuki%20on%20e621)"
-            let url = URL(string: "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)&_client=\(userAgent)")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let parsedData = try JSONDecoder().decode(Posts.self, from: data)
-            posts += parsedData.posts;
-        } catch {
-            print(error);
-        }
-    }
 }
 
 struct SearchView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+    }
+}
+
+struct PostPreviewFrame: View {
+    @State var post: PostContent;
+    @State var search: String;
+    
+    var body: some View {
+        
+        NavigationLink(destination: PostView(post: post, search: search)) {
+            ZStack {
+                if(post.preview.url != nil) {
+                    AsyncImage(url: URL(string: post.preview.url!)) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .clipped()
+                            .frame(minWidth: 0, maxWidth: .infinity)
+                            .frame(height: 150)
+                            .shadow(color: Color.primary.opacity(0.3), radius: 1)
+                    } placeholder: {
+                        ProgressView()
+                            .frame(minWidth: 0, maxWidth: .infinity)
+                            .frame(width: 100, height: 150)
+                    }
+                }
+                else {
+                    Text("Deleted")
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                        .frame(height: 150)
+                        .background(Color.gray.opacity(0.90))
+                }
+                VStack() {
+                    Spacer()
+                    HStack(alignment: .bottom) {
+                        Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
+                            .font(.system(size: 12))
+                            .fontWeight(.bold)
+                            .foregroundColor(Color.white)
+                        Spacer()
+                    }
+                    .padding(5.0)
+                    .background(Color.gray.opacity(0.50))
+                }
+            }.cornerRadius(10)
+            .padding(0.1)
+        }
     }
 }

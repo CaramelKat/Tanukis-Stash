@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  Tanuki's Stash
 //
-//  Created by Jay Poffinbarger on 1/7/22.
+//  Created by Jemma Poffinbarger on 1/7/22.
 //
 
 import SwiftUI
@@ -13,6 +13,7 @@ struct SettingsView: View {
     var presentationMode: Binding<PresentationMode>
     @State private var username: String = defaults.string(forKey: "username") ?? "";
     @State private var selection: String = defaults.string(forKey: "api_source") ?? "e621.net";
+    @State private var API_KEY: String = defaults.string(forKey: "API_KEY") ?? "";
     let sources = ["e621.net", "e926.net"];
     
     var body: some View {
@@ -33,6 +34,9 @@ struct SettingsView: View {
                 Section(header: Text("Accounts")) {
                     TextField("Username", text: $username).onDisappear() {
                         defaults.set(username, forKey: "username");
+                    }
+                    TextField("API Key", text: $API_KEY).onDisappear() {
+                        defaults.set(API_KEY, forKey: "API_KEY");
                     }
                 }
             }

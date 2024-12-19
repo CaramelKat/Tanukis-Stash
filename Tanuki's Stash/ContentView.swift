@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  Tanuki's Stash
 //
-//  Created by Jay Poffinbarger on 1/3/22.
+//  Created by Jemma Poffinbarger on 1/3/22.
 //
 
 import SwiftUI

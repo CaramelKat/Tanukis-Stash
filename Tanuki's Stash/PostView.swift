@@ -67,8 +67,20 @@ struct PostView: View {
                 .padding(10.0)
                 .background(Color.gray)
                 .cornerRadius(10)
-                
-                
+                if post.is_favorited {
+                    Button("Un-Favorite") {
+                        Task.init {
+                            post.is_favorited = await unFavoritePost(postId: post.id);
+                        }
+                    }
+                }
+                else {
+                    Button("Favorite") {
+                        Task.init {
+                            post.is_favorited = await favoritePost(postId: post.id);
+                        }
+                    }
+                }
                 VStack(alignment: .leading) {
                     AttributedText(descParser(text: .init(post.description)))
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -117,10 +129,10 @@ struct PostView: View {
     }
     func fetchRecentPosts(postID: Int) async {
         do {
-            let userAgent = "Tanukis%20Stash/1.0%20(by%20JayDaBirb%20on%20e621)"
-            let url = URL(string: "https://\(source)/posts/\(postID).json?_client=\(userAgent)")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let parsedData = try JSONDecoder().decode(Post.self, from: data)
+            let url = "https://\(source)/posts/\(postID).json?_client=\(userAgent)"
+            let data = await makeRequest(url: url, method: "GET", body: nil);
+            if (data) == nil { return; }
+            let parsedData = try JSONDecoder().decode(Post.self, from: data!)
             parentPost = parsedData.post;
         } catch {
             print(error);
