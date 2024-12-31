@@ -8,7 +8,11 @@ struct Post: Decodable {
     let post: PostContent;
 }
 
-struct PostContent: Decodable {
+struct PostContent: Decodable, Hashable {
+    static func == (lhs: PostContent, rhs: PostContent) -> Bool {
+        return lhs.id == rhs.id
+    }
+    
     let id: Int;
     let created_at: String;
     let updated_at: String;
@@ -34,7 +38,7 @@ struct PostContent: Decodable {
     let duration: Float?;
 }
 
-struct File: Decodable {
+struct File: Decodable, Hashable {
     let width: Int;
     let height: Int;
     let ext: String;
@@ -43,13 +47,13 @@ struct File: Decodable {
     let url: String?;
 }
 
-struct Preview: Decodable {
+struct Preview: Decodable, Hashable {
     let width: Int;
     let height: Int;
     let url: String?;
 }
 
-struct Sample: Decodable {
+struct Sample: Decodable, Hashable {
     let has: Bool;
     let height: Int;
     let width: Int;
@@ -57,24 +61,24 @@ struct Sample: Decodable {
     let alternates: Alternates;
 }
 
-struct Alternates: Decodable {
+struct Alternates: Decodable, Hashable {
     let original: Alternate?
 }
 
-struct Alternate: Decodable {
+struct Alternate: Decodable, Hashable {
     let type: String;
     let height: Int;
     let width: Int;
     let urls: [String?];
 }
 
-struct Score: Decodable {
+struct Score: Decodable, Hashable {
     let up: Int;
     let down: Int;
     let total: Int;
 }
 
-struct Tags: Decodable {
+struct Tags: Decodable, Hashable {
     let general: [String];
     let species: [String];
     let character: [String];
@@ -85,7 +89,7 @@ struct Tags: Decodable {
     let meta: [String];
 }
 
-struct Flags: Decodable {
+struct Flags: Decodable, Hashable {
    let pending: Bool;
    let flagged: Bool;
    let note_locked: Bool;
@@ -94,9 +98,19 @@ struct Flags: Decodable {
    let deleted: Bool;
 }
 
-struct Relationships: Decodable {
+struct Relationships: Decodable, Hashable {
     let parent_id: Int?;
     let has_children: Bool;
     let has_active_children: Bool;
     let children: [Int];
+}
+
+struct VoteResponse: Decodable, Hashable {
+    let score: Int?;
+    let up: Int?;
+    let down: Int?;
+    let our_score: Int?;
+    let success: Bool?;
+    let message: String?;
+    let code: String?;
 }

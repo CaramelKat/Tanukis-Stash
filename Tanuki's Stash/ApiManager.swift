@@ -57,7 +57,7 @@ func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostC
     do {
         let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
         let url = "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
-        let data = await makeRequest(url: url, method: "GET", body: nil);
+        let data = await makeRequest(url: url, method: "GET", body: nil, contentType: "application/json");
         if (data) == nil { return []; }
         let parsedData = try JSONDecoder().decode(Posts.self, from: data!)
         return parsedData.posts;
@@ -71,7 +71,7 @@ func fetchMoreRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [P
     do {
         let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
         let url = "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
-        let data = await makeRequest(url: url, method: "GET", body: nil);
+        let data = await makeRequest(url: url, method: "GET", body: nil, contentType: "application/json");
         if (data) == nil { return []; }
         let parsedData = try JSONDecoder().decode(Posts.self, from: data!)
         return parsedData.posts;
@@ -83,33 +83,49 @@ func fetchMoreRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [P
 
 func favoritePost(postId: Int) async -> Bool {
     let url = "https://\(source)/favorites.json?post_id=\(postId)"
-    let data = await makeRequest(url: url, method: "POST", body: nil);
+    let data = await makeRequest(url: url, method: "POST", body: nil, contentType: "application/json");
     if (data) == nil { return false; }
     return true;
 }
 
 func unFavoritePost(postId: Int) async -> Bool {
     let url = "https://\(source)/favorites/\(postId).json"
-    let data = await makeRequest(url: url, method: "DELETE", body: nil);
+    let data = await makeRequest(url: url, method: "DELETE", body: nil, contentType: "application/json");
     if (data) == nil { return true; }
     return false;
 }
 
-func makeRequest(url: String, method: String, body: Data?) async -> Data? {
+func votePost(postId: Int, value: Int, no_unvote: Bool) async -> Int {
+    let url = "https://\(source)/posts/\(postId)/votes.json"
+    let data = await makeRequest(url: url, method: "POST", body: "score=\(value)&no_unvote=\(no_unvote)".data(using: .utf8), contentType: "application/x-www-form-urlencoded");
+    if (data == nil) { return 0; }
+    do {
+        let json = try JSONDecoder().decode(VoteResponse.self, from: data!);
+        return json.our_score ?? 0
+    }
+    catch {
+        print("Error decoding vote response: \(error)")
+        return 0
+    }
+}
+
+func makeRequest(url: String, method: String, body: Data?, contentType: String) async -> Data? {
     let url = URL(string: url)
     var request = URLRequest(url: url!)
     request.httpMethod = method
-    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.addValue(contentType, forHTTPHeaderField: "Content-Type")
     request.addValue(userAgent, forHTTPHeaderField: "User-Agent")
-    request.addValue("Basic \(AUTH_STRING)", forHTTPHeaderField: "Authorization")
+    if ![API_KEY, username].contains("") {
+        request.addValue("Basic \(AUTH_STRING)", forHTTPHeaderField: "Authorization")
+    }
     print("Making request to \(url!)")
     print("Method: \(method)")
     print("Body: \(body?.debugDescription ?? "")")
     do {
-        if !(body?.isEmpty ?? false) {
-            request.httpBody = body
+        if (body != nil) {
+            request.httpBody = body!
         }
-        let (data, _) = try await URLSession.shared.data(for: request);
+        let (data, response) = try await URLSession.shared.data(for: request);
         return data;
         
     } catch {

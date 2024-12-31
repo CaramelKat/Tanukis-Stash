@@ -25,40 +25,41 @@ struct SearchView: View {
     var body: some View {
         ScrollView(.vertical) {
             LazyVGrid(columns: vGridLayout) {
-                ForEach(posts, id: \.id) { post in
+                ForEach(Array(posts.enumerated()), id: \.element) { i, post in
                     PostPreviewFrame(post: post, search: search)
-                        .onAppear {
+                    .onAppear {
+                        if (i == posts.count - 9) {
                             Task.init {
-                                if(checkRefresh(post.id)) {
-                                    page += 1;
-                                    posts += await fetchMoreRecentPosts(page, limit, search);
-                                }
+                                page += 1;
+                                posts += await fetchMoreRecentPosts(page, limit, search);
                             }
                         }
+                    }
                 }
             }
             .padding(10)
         }.task {
-            source = defaults.string(forKey: "api_source") ?? "e621.net";
             if($posts.count == 0) {
                 posts = await fetchRecentPosts(1, 28, search)
             }
         }
-        .navigationBarTitle("Posts", displayMode: .inline)
-        .navigationBarItems(trailing: Button(action: {
-        }) {
-            NavigationLink(destination: SearchView(search: String("fav:\(defaults.string(forKey: "username") ?? "default")"))) {
-                Image(systemName: "heart").imageScale(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                NavigationLink(destination: SearchView(search: String("fav:\(defaults.string(forKey: "username") ?? "default")"))) {
+                    Image(systemName: "heart").imageScale(.large)
+                }
             }
-        })
-        .navigationBarItems(leading: Button(action: {
-            self.showSettings = true
-        }) {
-            Image(systemName: "person.crop.circle").imageScale(.large)
-        })
-        .sheet(isPresented: $showSettings, content: {
-            SettingsView()
-        })
+            
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    self.showSettings = true
+                }) {
+                    Image(systemName: "person.crop.circle").imageScale(.large)
+                }
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Posts")
         .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search for tags") {
             //List {
                 ForEach(searchSuggestions, id: \.self) { tag in
@@ -70,6 +71,7 @@ struct SearchView: View {
                 }
             //}
         }
+        .textInputAutocapitalization(.never)
         .onChange(of: search) { newQuery in
             Task.init { if(search.count >= 3) {
                 Task.init {
@@ -86,15 +88,10 @@ struct SearchView: View {
             }
         }
         .onChange(of: showSettings, perform: {showSettings in
-            if(!showSettings && (source != defaults.string(forKey: "api_source"))) {
-                source = defaults.string(forKey: "api_source") ?? "e926.net";
-                posts = [];
-                Task.init {
-                    page = 1;
-                    posts = await fetchRecentPosts(page, limit, search)
-                    searchSuggestions.removeAll();
-                }
-            }
+            updateSettings();
+        })
+        .sheet(isPresented: $showSettings, content: {
+            SettingsView()
         })
         .refreshable {
             page = 1;
@@ -121,6 +118,21 @@ struct SearchView: View {
             }
         }
         else { search = tag; }
+    }
+    
+    func updateSettings() {
+        showSettings = !showSettings;
+        if(showSettings) {
+            source = defaults.string(forKey: "api_source") ?? "e926.net";
+            if(posts.count == 0) {
+                posts = [];
+                Task.init {
+                    page = 1;
+                    posts = await fetchRecentPosts(page, limit, search)
+                    searchSuggestions.removeAll();
+                }
+            }
+        }
     }
 }
 

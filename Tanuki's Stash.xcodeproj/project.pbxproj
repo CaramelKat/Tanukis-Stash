@@ -24,6 +24,8 @@
 		02D21B2028827AA700239990 /* ApiManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D21B1F28827AA700239990 /* ApiManager.swift */; };
 		50914FA92C26652000E52BD0 /* AttributedText in Frameworks */ = {isa = PBXBuildFile; productRef = 50914FA82C26652000E52BD0 /* AttributedText */; };
 		50C1182B2B648B18003F5D4E /* AlertToast in Frameworks */ = {isa = PBXBuildFile; productRef = 50C1182A2B648B18003F5D4E /* AlertToast */; };
+		50F0859B2D15317600D4736D /* ZoomableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50F0859A2D15317500D4736D /* ZoomableContainer.swift */; };
+		50F0859D2D15320800D4736D /* FullscreenImageViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50F0859C2D1531FF00D4736D /* FullscreenImageViewer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +61,8 @@
 		027E2B482789486F00FCEDB2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		02D21B1D288279C800239990 /* TagModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagModel.swift; sourceTree = "<group>"; };
 		02D21B1F28827AA700239990 /* ApiManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiManager.swift; sourceTree = "<group>"; };
+		50F0859A2D15317500D4736D /* ZoomableContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableContainer.swift; sourceTree = "<group>"; };
+		50F0859C2D1531FF00D4736D /* FullscreenImageViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenImageViewer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,6 +119,8 @@
 		020288092783C74500341901 /* Tanuki's Stash */ = {
 			isa = PBXGroup;
 			children = (
+				50F0859C2D1531FF00D4736D /* FullscreenImageViewer.swift */,
+				50F0859A2D15317500D4736D /* ZoomableContainer.swift */,
 				027E2B312784DDFD00FCEDB2 /* Tanuki's Stash.entitlements */,
 				0202880A2783C74500341901 /* Tanuki_s_StashApp.swift */,
 				0202880C2783C74500341901 /* ContentView.swift */,
@@ -291,6 +297,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				50F0859D2D15320800D4736D /* FullscreenImageViewer.swift in Sources */,
+				50F0859B2D15317600D4736D /* ZoomableContainer.swift in Sources */,
 				0202880D2783C74500341901 /* ContentView.swift in Sources */,
 				02D21B1E288279C800239990 /* TagModel.swift in Sources */,
 				02D21B2028827AA700239990 /* ApiManager.swift in Sources */,
@@ -475,7 +483,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.5;
+				MARKETING_VERSION = 0.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.jemsoftware.tanukistash;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";
@@ -513,7 +521,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.5;
+				MARKETING_VERSION = 0.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.jemsoftware.tanukistash;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator";
