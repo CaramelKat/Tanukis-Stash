@@ -15,15 +15,20 @@ import AttributedText
 
 struct PostView: View {
     @State private var showImageViewer: Bool = false;
-    @State private var showToast: Bool = false
+    @State private var showToast: Bool = false;
     @State private var showLoadingToast: Bool = false
+    @State private var showFailToast: Bool = false;
     @State var showSettings = false;
     @State var post: PostContent;
     @State var search: String;
     @State var url: String = "";
     @State private var parentPost: PostContent?;
     @State var favorited: Bool = false;
-    @State var our_score: Int = 0;
+    @State var our_score: Int = 2;
+    @State var score_valid: Bool = false
+    @State private var authorizationStatus = PHAuthorizationStatus.notDetermined
+    
+    var buttonSpacing = EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 5);
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -78,49 +83,32 @@ struct PostView: View {
                             }
                         }
                     }
-                    
-                    Spacer();
-                    
-                    VStack(alignment: .leading) {
+                    if (!post.description.isEmpty) {
+                        Spacer()
                         AttributedText(descParser(text: .init(post.description)))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    
                     Spacer()
-                    
-                    HStack {
-                        postTags(post: post, search: search)
-                        Spacer()
-                        VStack(alignment:.trailing) {
-                            Text("Post Details")
-                                .font(.title3)
-                                .fontWeight(.heavy)
-                            
-                            Text("Author")
-                                .font(.headline)
-                                .fontWeight(.heavy)
-                            Text(String(post.uploader_id))
-                                .font(.footnote)
-                            
-                            if(post.relationships.parent_id != nil) {
-                                Text("Parent")
-                                    .font(.headline)
-                                    .fontWeight(.heavy)
-                                Text(String(post.relationships.parent_id!))
-                                    .font(.footnote)
-                            }
+                    VStack(alignment: .leading) {
+                        TagGroup(label: "Artist", tags: post.tags.artist, search: search, textColor: Color.yellow)
+                        TagGroup(label: "Character", tags: post.tags.character, search: search, textColor: Color.green)
+                        TagGroup(label: "Copyright", tags: post.tags.copyright, search: search, textColor: Color.purple)
+                        TagGroup(label: "Species", tags: post.tags.species, search: search, textColor: Color.red)
+                        TagGroup(label: "General", tags: post.tags.general, search: search, textColor: Color.blue)
+                        if (!post.sources.isEmpty) {
                             Text("Sources")
                                 .font(.headline)
                                 .fontWeight(.heavy)
                             ForEach(post.sources, id: \.self) { tag in
                                 Text(.init(tag))
                                     .font(.footnote)
+                                    .multilineTextAlignment(.leading)
+                                    .truncationMode(.tail)
+                                    .frame(maxWidth: .infinity, maxHeight: 10)
                             }
-                            Spacer()
                         }
+                        Spacer()
                     }
-                    Spacer()
-                    Spacer()
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -133,46 +121,57 @@ struct PostView: View {
             .toast(isPresenting: $showLoadingToast){
                 AlertToast(type: .loading, title: "Saving media...")
             }
+            .alert(isPresented: $showFailToast) {
+                Alert(
+                    title: Text("Permission Denied"),
+                    message: Text("You have denied access to the photo library. Please enable access in your settings if you want to use this feature."),
+                    dismissButton: .default(Text("OK")) {
+                        // Action to open the app settings
+                        if let settingsURL = URL(string: UIApplication.openSettingsURLString),
+                           UIApplication.shared.canOpenURL(settingsURL) {
+                            UIApplication.shared.open(settingsURL)
+                        }
+                    }
+                )
+            }
             .task {
                 await fetchCurrentPostLiked();
                 await fetchCurrentPostVote();
             }
+            .padding(EdgeInsets(top: 0, leading: 0, bottom: 30, trailing: 0))
             VStack{
                 HStack() {
                     Spacer().frame(width: 10)
                     Button(action: {
                         Task.init {
                             favorited = favorited ? await unFavoritePost(postId: post.id) : await favoritePost(postId: post.id);
-                            print(favorited ? "Favorited" : "Unfavorited")
                         }
                     }) {
                         Image(systemName: favorited ? "heart.fill" : "heart")
                             .font(.title)
-                            .foregroundColor(.yellow)
-                            .padding(10)
+                            .foregroundColor(.red)
+                            .padding(buttonSpacing)
                     }
                     Button(action: {
                         Task.init {
                             our_score = await votePost(postId: post.id, value: 1, no_unvote: false);
-                            print(our_score)
                         }
                     }) {
                         Image(systemName: our_score == 1 ? "arrowtriangle.up.fill" : "arrowtriangle.up")
                             .font(.title)
                             .foregroundColor(.green)
-                            .padding(10)
-                    }
+                            .padding(buttonSpacing)
+                    }.disabled(!score_valid)
                     Button(action: {
                         Task.init {
                             our_score = await votePost(postId: post.id, value: -1, no_unvote: false);
-                            print(our_score)
                         }
                     }) {
                         Image(systemName: our_score == -1 ? "arrowtriangle.down.fill" : "arrowtriangle.down")
                             .font(.title)
-                            .foregroundColor(.red)
-                            .padding(10)
-                    }
+                            .foregroundColor(.orange)
+                            .padding(buttonSpacing)
+                    }.disabled(!score_valid)
                     Spacer()
                     Button(action: {
                         Task.init {
@@ -181,12 +180,12 @@ struct PostView: View {
                     }) {
                         Image(systemName: "square.and.arrow.down")
                             .font(.title)
-                            .padding(10)
+                            .padding(buttonSpacing)
                     }
                     ShareLink(item: URL(string: "https://\(source)/posts/\(post.id)")!) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.title)
-                            .padding(10)
+                            .padding(buttonSpacing)
                     }
                     Spacer().frame(width: 10)
                 }
@@ -223,7 +222,10 @@ struct PostView: View {
     }
     
     func fetchCurrentPostVote() async {
-        our_score = await votePost(postId: post.id, value: 0, no_unvote: true);
+        our_score = await getVote(postId: post.id);
+        print(our_score)
+        score_valid = [-1,0,1].contains(our_score);
+        print(score_valid)
     }
     
     func writeToPhotoAlbum(image: UIImage) {
@@ -283,6 +285,15 @@ struct PostView: View {
         }
     
     func saveFile() {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            authorizationStatus = status
+            if status == .denied {
+                showFailToast.toggle()
+            }
+        }
+        if (authorizationStatus != .authorized) {
+            return
+        }
         if (String(post.file.ext) == "gif") {
             showLoadingToast.toggle()
             var image: UIImage?
@@ -332,115 +343,60 @@ struct PostView: View {
     }
 }
 
-struct postTags: View {
-    @State var post: PostContent;
+struct TagGroup: View {
+    @State var label: String;
+    @State var tags: [String];
     @State var search: String;
+    @State var textColor: Color;
     
     var body: some View {
-        VStack(alignment:.leading) {
-            Text("Artist")
-                .font(.title3)
-                .fontWeight(.heavy)
-                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
+        if tags.isEmpty {
+            
+        } else {
+            DisclosureGroup {
+                VStack(alignment: .leading) {
+                    ForEach(tags, id: \.self) { tag in
+                        Tag(tag: tag, search: search, textColor: textColor)
+                    }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            } label: {
+                Text(label)
+                    .font(.title3)
+                    .fontWeight(.heavy)
+                    .foregroundColor(Color.primary)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+    }
+}
 
-            ForEach(post.tags.artist, id: \.self) { tag in
-                Menu() {
-                    NavigationLink(destination: SearchView(search: String(tag))) {
-                        Text("New Search")
-                    }
-                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                        Text("Add to Current Search")
-                    }
-                } label: {
-                    Text(tag)
-                        .font(.body)
-                        .foregroundColor(Color.yellow)
-                }
-                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+struct Tag: View {
+    @State var tag: String
+    @State var search: String
+    @State var textColor: Color;
+    @State var isActive: Bool = false
+    
+    var body: some View {
+        Menu {
+            NavigationLink(destination: SearchView(search: String(tag))) {
+                Text("New Search")
             }
-            
-            Text("Character")
-                .font(.title3)
-                .fontWeight(.heavy)
-                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-            
-            ForEach(post.tags.character, id: \.self) { tag in
-                Menu() {
-                    NavigationLink(destination: SearchView(search: String(tag))) {
-                        Text("New Search")
-                    }
-                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                        Text("Add to Current Search")
-                    }
-                } label: {
-                    Text(tag)
-                        .font(.body)
-                        .foregroundColor(Color.green)
-                }
-                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
+            NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
+                Text("Add to Current Search")
             }
-            
-            Text("Copyright")
-                .font(.title3)
-                .fontWeight(.heavy)
-                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-            
-            ForEach(post.tags.copyright, id: \.self) { tag in
-                Menu() {
-                    NavigationLink(destination: SearchView(search: String(tag))) {
-                        Text("New Search")
-                    }
-                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                        Text("Add to Current Search")
-                    }
-                } label: {
-                    Text(tag)
-                        .font(.body)
-                        .foregroundColor(Color.purple)
-                }
-                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-            }
-            
-            Text("Species")
-                .font(.title3)
-                .fontWeight(.heavy)
-                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-            
-            ForEach(post.tags.species, id: \.self) { tag in
-                Menu() {
-                    NavigationLink(destination: SearchView(search: String(tag))) {
-                        Text("New Search")
-                    }
-                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                        Text("Add to Current Search")
-                    }
-                } label: {
-                    Text(tag)
-                        .font(.body)
-                        .foregroundColor(Color.red)
-                }
-                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-            }
-            
-            Text("General")
-                .font(.title3)
-                .fontWeight(.heavy)
-                .padding(EdgeInsets(top: 0, leading: 0, bottom: -3, trailing: 0))
-            
-            ForEach(post.tags.general, id: \.self) { tag in
-                Menu() {
-                    NavigationLink(destination: SearchView(search: String(tag))) {
-                        Text("New Search")
-                    }
-                    NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                        Text("Add to Current Search")
-                    }
-                } label: {
-                    Text(tag)
-                        .font(.body)
-                }
-                .padding(EdgeInsets(top: -5, leading: 0, bottom: -2, trailing: 0))
-            }
+        } label: {
+            Text(tag)
+                .font(.body)
+                .foregroundColor(textColor)
+                .multilineTextAlignment(.leading)
+        } primaryAction: {
+            isActive.toggle()
+        }
+        //.background(
+        //    NavigationLink(destination: SearchView(search: String(tag)), isActive: $isActive) {}
+        //)
+        .navigationDestination(isPresented: $isActive) {
+            SearchView(search: String(tag))
         }
     }
 }

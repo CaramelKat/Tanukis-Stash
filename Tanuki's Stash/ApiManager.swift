@@ -56,7 +56,13 @@ func createTagList(_ search: String) async -> [String] {
 func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostContent] {
     do {
         let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-        let url = "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
+        let url: String;
+        if (tags == "fav:\(username)") {
+            url = "https://\(source)/favorites.json?limit=\(limit)&page=\(page)"
+        } else {
+            url = "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
+        }
+
         let data = await makeRequest(url: url, method: "GET", body: nil, contentType: "application/json");
         if (data) == nil { return []; }
         let parsedData = try JSONDecoder().decode(Posts.self, from: data!)
@@ -95,12 +101,29 @@ func unFavoritePost(postId: Int) async -> Bool {
     return false;
 }
 
+func getVote(postId: Int) async -> Int {
+    let url = "https://\(source)/posts/\(postId)"
+    let data = await makeRequest(url: url, method: "GET", body: nil, contentType: "text/html");
+    if (data == nil) { return 0; }
+    do {
+        let textContent = String(data: data!, encoding: .utf8) ?? ""
+        if textContent.contains("post-vote-up-\(postId) score-positive") {
+            return 1
+        }
+        else if textContent.contains("post-vote-down-\(postId) score-negative") {
+            return -1
+        }
+        return 0
+    }
+}
+
 func votePost(postId: Int, value: Int, no_unvote: Bool) async -> Int {
     let url = "https://\(source)/posts/\(postId)/votes.json"
     let data = await makeRequest(url: url, method: "POST", body: "score=\(value)&no_unvote=\(no_unvote)".data(using: .utf8), contentType: "application/x-www-form-urlencoded");
     if (data == nil) { return 0; }
     do {
         let json = try JSONDecoder().decode(VoteResponse.self, from: data!);
+        print(json)
         return json.our_score ?? 0
     }
     catch {
@@ -121,16 +144,18 @@ func makeRequest(url: String, method: String, body: Data?, contentType: String) 
     print("Making request to \(url!)")
     print("Method: \(method)")
     print("Body: \(body?.debugDescription ?? "")")
+    print("contentType: \(contentType)")
     do {
-        if (body != nil) {
+        if (body != nil && method != "GET") {
             request.httpBody = body!
         }
         let (data, response) = try await URLSession.shared.data(for: request);
+        //print(response)
         return data;
         
     } catch {
         DispatchQueue.main.async {
-            print("Failed to make request")
+            print("Failed to make request: \(error)")
         }
         return nil
     }
