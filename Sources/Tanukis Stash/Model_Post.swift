@@ -58,18 +58,24 @@ struct Sample: Decodable, Hashable {
     let height: Int;
     let width: Int;
     let url: String?;
-    let alternates: Alternates;
+    let alternates: Alternates?;
 }
 
 struct Alternates: Decodable, Hashable {
     let original: Alternate?
+    let variants: Variants?
+}
+
+struct Variants: Decodable, Hashable {
+    let mp4: Alternate?;
 }
 
 struct Alternate: Decodable, Hashable {
-    let type: String;
-    let height: Int;
-    let width: Int;
-    let urls: [String?];
+    let type: String?;
+    let height: Int?;
+    let width: Int?;
+    let url: String?;
+    let urls: [String]?;
 }
 
 struct Score: Decodable, Hashable {
