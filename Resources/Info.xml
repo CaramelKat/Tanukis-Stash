@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+      <string>iPhoneOS</string>
+    </array>
+    <key>CFBundleVersion</key>
+    <string>2</string>
+    <key>DTCompiler</key>
+    <string>com.apple.compilers.llvm.clang.1_0</string>
+    <key>DTPlatformBuild</key>
+    <string>22A5342a</string>
+    <key>DTSDKBuild</key>
+    <string>22A5342a</string>
+    <key>DTSDKName</key>
+    <string>iphoneos18.0</string>
+    <key>DTXcode</key>
+    <string>1600</string>
+    <key>DTXcodeBuild</key>
+    <string>16A5230g</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.social-networking</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>NSAccentColorName</key>
+    <string>AccentColor</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>We want to save the loaded photo</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Allows the saving of posts to the device</string>
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+    <key>UIDeviceFamily</key>
+    <array>
+      <integer>1</integer>
+      <integer>2</integer>
+    </array>
+    <key>UILaunchScreen</key>
+    <dict>
+      <key>UILaunchScreen</key>
+      <dict/>
+    </dict>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+      <string>arm64</string>
+    </array>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+      <string>UIInterfaceOrientationLandscapeLeft</string>
+      <string>UIInterfaceOrientationLandscapeRight</string>
+      <string>UIInterfaceOrientationPortrait</string>
+      <string>UIInterfaceOrientationPortraitUpsideDown</string>
+    </array>
+  </dict>
+</plist>
