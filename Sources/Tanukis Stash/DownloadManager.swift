@@ -9,6 +9,25 @@ func determineAuthorizationStatus() -> PHAuthorizationStatus {
     return authorizationStatus
 }
 
+func requestAuthorization() {
+    PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+        switch status {
+        case .authorized:
+            os_log("%{public}s", log: .default, "Authorization granted");
+        case .denied:
+            os_log("%{public}s", log: .default, "Authorization denied");
+        case .restricted:
+            os_log("%{public}s", log: .default, "Authorization restricted");
+        case .notDetermined:
+            os_log("%{public}s", log: .default, "Authorization not determined");
+        case .limited:
+            os_log("%{public}s", log: .default, "Authorization limited");
+        @unknown default:
+            os_log("%{public}s", log: .default, "Unknown authorization status");
+        }
+    }
+}
+
 func writeToPhotoAlbum(image: UIImage) {
     UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
 }
@@ -94,6 +113,7 @@ func downloadVideoLinkAndCreateAsset(_ videoLink: String, showToast: Binding<Int
             try FileManager.default.moveItem(at: location, to: destinationURL)
             let authorizationStatus = determineAuthorizationStatus()
             if (authorizationStatus != .authorized) {
+                requestAuthorization()
                 Task { @MainActor in
                     showToast.wrappedValue = 3 // Not authorized
                     os_log("%{public}s %{public}s", log: .default, "Not authorized to save to photo library");
@@ -139,6 +159,7 @@ func downloadVideoLinkAndCreateAsset(_ videoLink: String, showToast: Binding<Int
 func saveFile(post: PostContent, showToast: Binding<Int>) {
     let authorizationStatus = determineAuthorizationStatus()
     if (authorizationStatus != .authorized) {
+        requestAuthorization()
         Task { @MainActor in
             showToast.wrappedValue = 3 // Not authorized
         }
