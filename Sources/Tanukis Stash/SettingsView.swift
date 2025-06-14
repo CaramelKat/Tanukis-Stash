@@ -15,20 +15,29 @@ struct SettingsView: View {
     @State private var selection: String = UserDefaults.standard.string(forKey: "api_source") ?? "e621.net";
     @State private var API_KEY: String = UserDefaults.standard.string(forKey: "API_KEY") ?? "";
     @State private var ENABLE_AIRPLAY: Bool = UserDefaults.standard.bool(forKey: "ENABLE_AIRPLAY");
+    @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     let sources = ["e926.net", "e621.net"];
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Accounts")) {
+                Section(header: Text("Account")) {
                     TextField("Username", text: $username).onDisappear() {
-                        UserDefaults.standard.set(username, forKey: "username");
+                        UserDefaults.standard.set(username.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "username");
+                    }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
+                    if (!AUTHENTICATED) {
+                        TextField("API Key", text: $API_KEY).onDisappear() {
+                            UserDefaults.standard.set(API_KEY.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "API_KEY");
+                        }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
                     }
-                    TextField("API Key", text: $API_KEY).onDisappear() {
-                        UserDefaults.standard.set(API_KEY, forKey: "API_KEY");
+                    LoginButton(AUTHENTICATED: $AUTHENTICATED, username: $username, API_KEY: $API_KEY)
+                }
+
+                if (AUTHENTICATED) {
+                    Section(header: Text("User Settings")) {
+                        UserSettingsView()
                     }
                 }
-                
                 Section(header: Text("App Settings")) {
                     Picker("API Source", selection: $selection) {
                         ForEach(sources, id: \.self) {
@@ -45,6 +54,21 @@ struct SettingsView: View {
                             UserDefaults.standard.set(newValue, forKey: "ENABLE_AIRPLAY");
                         })
                 }
+
+                Section(header: Text("App Information")) {
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Build")
+                        Spacer()
+                        Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
             .navigationBarTitle("Settings", displayMode: .inline)
             .navigationBarItems(trailing: Button("Dismiss", action: {
@@ -57,5 +81,48 @@ struct SettingsView: View {
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView()
+    }
+}
+
+struct LoginButton: View {
+    @Binding var AUTHENTICATED: Bool
+    @Binding var username: String
+    @Binding var API_KEY: String
+    @State private var ShowAlert: Bool = false;
+    
+    var body: some View {
+        if (AUTHENTICATED) {
+            Button("Logout") {
+                AUTHENTICATED = false;
+                UserDefaults.standard.set(AUTHENTICATED, forKey: "AUTHENTICATED");
+            }.foregroundColor(.red)
+        } else {
+            Button("Login") {
+                Task {
+                    UserDefaults.standard.set(username.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "username");
+                    UserDefaults.standard.set(API_KEY.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "API_KEY");
+                    AUTHENTICATED = await login();
+                    UserDefaults.standard.set(AUTHENTICATED, forKey: "AUTHENTICATED");
+                    if (!AUTHENTICATED) {
+                        ShowAlert.toggle()
+                    }
+                }
+            }
+            .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || API_KEY.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .alert(isPresented: $ShowAlert) {
+                Alert(
+                    title: Text("Login Failed"),
+                    message: Text("Check your credentials and try again")
+                )
+            }
+        }
+    }
+}
+
+struct UserSettingsView: View {
+    @State private var text: String = UserDefaults.standard.string(forKey: "text") ?? "";
+    
+    var body: some View {
+        TextField("Blacklist", text: $text,  axis: .vertical)
     }
 }

@@ -13,6 +13,7 @@ struct SearchView: View {
     @State var search: String;
     @State var page = 1;
     @State var showSettings = false;
+    @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     @Environment(\.dismiss) private var dismiss;
     @Environment(\.dismissSearch) private var dismissSearch;
     
@@ -56,9 +57,11 @@ struct SearchView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink(destination: SearchView(search: String("fav:\(UserDefaults.standard.string(forKey: "username") ?? "default")"))) {
-                    Image(systemName: "heart").imageScale(.large)
+            if (AUTHENTICATED) {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: SearchView(search: String("fav:\(UserDefaults.standard.string(forKey: "username") ?? "default")"))) {
+                        Image(systemName: "heart").imageScale(.large)
+                    }
                 }
             }
             if (isTopView) {
@@ -141,6 +144,8 @@ struct SearchView: View {
     
     func updateSettings() {
         showSettings = !showSettings;
+        AUTHENTICATED = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
+        
         if(showSettings) {
             if(posts.count == 0) {
                 posts = [];

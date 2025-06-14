@@ -12,6 +12,8 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             SearchView(search: "", isTopView: true)
+        }.task {
+            UserDefaults.standard.set(await login(), forKey: "AUTHENTICATED");
         }
     }
 }

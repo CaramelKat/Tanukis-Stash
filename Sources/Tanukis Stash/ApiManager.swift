@@ -23,6 +23,21 @@ extension URLResponse {
     }
 }
 
+func login() async -> Bool {
+    let username = UserDefaults.standard.string(forKey: "username") ?? "";
+    let API_KEY = UserDefaults.standard.string(forKey: "API_KEY") ?? "";
+    if username.isEmpty || API_KEY.isEmpty {
+        return false;
+    }
+    let testFavorites = await fetchRecentPosts(1, 1, "fav:\(username)");
+    if testFavorites.isEmpty {
+        os_log("Login failed for %{public}s", log: .default, username);
+        return false;
+    }
+    os_log("Login successful for %{public}s", log: .default, username);
+    return true;
+}
+
 func fetchTags(_ text: String) async -> [String] {
     do {
         let encoded: String? = text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)

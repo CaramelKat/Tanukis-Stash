@@ -205,6 +205,7 @@ struct ActionBar: View {
     @State var favorited: Bool = false;
     @State var our_score: Int = 2;
     @State var score_valid: Bool = false
+    @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     @Binding var displayToastType: Int
 
     var buttonSpacing = EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 5);
@@ -213,36 +214,38 @@ struct ActionBar: View {
         VStack {
             HStack() {
                 Spacer().frame(width: 15)
-                Button(action: {
-                    Task.init {
-                        favorited = favorited ? await unFavoritePost(postId: post.id) : await favoritePost(postId: post.id);
-                    }
-                }) {
-                    Image(systemName: favorited ? "heart.fill" : "heart")
-                        .font(.title)
-                        .foregroundColor(.red)
-                        .padding(buttonSpacing)
+                if (AUTHENTICATED) {
+                    Button(action: {
+                        Task.init {
+                            favorited = favorited ? await unFavoritePost(postId: post.id) : await favoritePost(postId: post.id);
+                        }
+                    }) {
+                        Image(systemName: favorited ? "heart.fill" : "heart")
+                            .font(.title)
+                            .foregroundColor(.red)
+                            .padding(buttonSpacing)
+                    }.disabled(!AUTHENTICATED)
+                    Button(action: {
+                        Task.init {
+                            our_score = await votePost(postId: post.id, value: 1, no_unvote: false);
+                        }
+                    }) {
+                        Image(systemName: our_score == 1 ? "arrowtriangle.up.fill" : "arrowtriangle.up")
+                            .font(.title)
+                            .foregroundColor(!score_valid ? .gray : .green)
+                            .padding(buttonSpacing)
+                    }.disabled(!score_valid || !AUTHENTICATED)
+                    Button(action: {
+                        Task.init {
+                            our_score = await votePost(postId: post.id, value: -1, no_unvote: false);
+                        }
+                    }) {
+                        Image(systemName: our_score == -1 ? "arrowtriangle.down.fill" : "arrowtriangle.down")
+                            .font(.title)
+                            .foregroundColor(!score_valid ? .gray : .orange)
+                            .padding(buttonSpacing)
+                    }.disabled(!score_valid || !AUTHENTICATED)
                 }
-                Button(action: {
-                    Task.init {
-                        our_score = await votePost(postId: post.id, value: 1, no_unvote: false);
-                    }
-                }) {
-                    Image(systemName: our_score == 1 ? "arrowtriangle.up.fill" : "arrowtriangle.up")
-                        .font(.title)
-                        .foregroundColor(!score_valid ? .gray : .green)
-                        .padding(buttonSpacing)
-                }.disabled(!score_valid)
-                Button(action: {
-                    Task.init {
-                        our_score = await votePost(postId: post.id, value: -1, no_unvote: false);
-                    }
-                }) {
-                    Image(systemName: our_score == -1 ? "arrowtriangle.down.fill" : "arrowtriangle.down")
-                        .font(.title)
-                        .foregroundColor(!score_valid ? .gray : .orange)
-                        .padding(buttonSpacing)
-                }.disabled(!score_valid)
                 Spacer()
                 Button(action: {
                     Task.init {
