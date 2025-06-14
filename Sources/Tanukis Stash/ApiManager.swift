@@ -7,30 +7,43 @@
 
 import Foundation
 import SwiftUI
+import os.log
 
-var source = defaults.string(forKey: "api_source") ?? "e926.net";
-var API_KEY = defaults.string(forKey: "API_KEY") ?? "";
-var username = defaults.string(forKey: "username") ?? "";
-var tagList = [String]();
 let userAgent: String = "Tanukis%20Stash/0.0.5%20(by%20JemTanuki%20on%20e621)";
-let AUTH_STRING: String = "\(username):\(API_KEY)".data(using: .utf8)?.base64EncodedString() ?? "";
+let log = OSLog.init(subsystem: "dev.jemsoftware.tanukistash", category: "main")
 
-func fetchTags(_ text: String) async {
-    do {
-        let url = URL(string: "https://\(source)/tags/autocomplete.json?search%5Bname_matches%5D=\(text)&expiry=7&_client=\(userAgent)")!
-        let (data, _) = try await URLSession.shared.data(from: url)
-        let parsedData = try JSONDecoder().decode([TagContent].self, from: data)
-        let tags = parsedData;
-        await processTags(tags);
-    } catch {
-        print(error);
+// Thanks Stackoverflow: https://stackoverflow.com/a/45624666
+extension URLResponse {
+
+    func getStatusCode() -> Int? {
+        if let httpResponse = self as? HTTPURLResponse {
+            return httpResponse.statusCode
+        }
+        return nil
     }
 }
 
-func processTags(_ tags: [TagContent]) async {
+func fetchTags(_ text: String) async -> [String] {
+    do {
+        let encoded: String? = text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
+        let url: String = "/tags/autocomplete.json?search%5Bname_matches%5D=\(encoded!)&expiry=7&_client=\(userAgent)"
+
+        let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+        if (data) == nil { return []; }
+        let tags = try JSONDecoder().decode([TagContent].self, from: data!)
+        return await processTags(tags);
+    } catch {
+        //os_log("%{public}s", log: .default, error);
+        return [];
+    }
+}
+
+func processTags(_ tags: [TagContent]) async  -> [String] {
+    var tagList = [String]();
     for tag in tags {
         tagList.append(tag.name);
     }
+    return tagList
 }
 
 func parseSearch(_ searchText: String) -> String {
@@ -45,65 +58,58 @@ func parseSearch(_ searchText: String) -> String {
 }
 
 func createTagList(_ search: String) async -> [String] {
-    tagList.removeAll();
     let newSearchText = parseSearch(search);
     if(newSearchText.count >= 3) {
-        await fetchTags(newSearchText);
+        return await fetchTags(newSearchText);
     }
-    return tagList;
+    return []
 }
 
 func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostContent] {
     do {
+        let username = UserDefaults.standard.string(forKey: "username") ?? "";
         let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
         let url: String;
+        os_log("%{public}s %{public}s", log: .default, tags, "fav:\(username)");
         if (tags == "fav:\(username)") {
-            url = "https://\(source)/favorites.json?limit=\(limit)&page=\(page)"
+            url = "/favorites.json?limit=\(limit)&page=\(page)"
         } else {
-            url = "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
+            url = "/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
         }
 
-        let data = await makeRequest(url: url, method: "GET", body: nil, contentType: "application/json");
-        if (data) == nil { return []; }
+        let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+        os_log("Data recieved?", log: .default);
+        if (data) == nil { 
+            os_log("Failed to fetch posts", log: .default);
+            return []; 
+        }
+        os_log("Not nil, let's unpack", log: .default);
         let parsedData = try JSONDecoder().decode(Posts.self, from: data!)
+        os_log("Unpacked", log: .default);
         return parsedData.posts;
     } catch {
-        print(error);
-        return [];
-    }
-}
-
-func fetchMoreRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostContent] {
-    do {
-        let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-        let url = "https://\(source)/posts.json?tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
-        let data = await makeRequest(url: url, method: "GET", body: nil, contentType: "application/json");
-        if (data) == nil { return []; }
-        let parsedData = try JSONDecoder().decode(Posts.self, from: data!)
-        return parsedData.posts;
-    } catch {
-        print(error);
+        os_log("Error! %{public}@", log: .default, String(describing: error));
         return [];
     }
 }
 
 func favoritePost(postId: Int) async -> Bool {
-    let url = "https://\(source)/favorites.json?post_id=\(postId)"
-    let data = await makeRequest(url: url, method: "POST", body: nil, contentType: "application/json");
+    let url = "/favorites.json?post_id=\(postId)"
+    let data = await makeRequest(destination: url, method: "POST", body: nil, contentType: "application/json");
     if (data) == nil { return false; }
     return true;
 }
 
 func unFavoritePost(postId: Int) async -> Bool {
-    let url = "https://\(source)/favorites/\(postId).json"
-    let data = await makeRequest(url: url, method: "DELETE", body: nil, contentType: "application/json");
+    let url = "/favorites/\(postId).json"
+    let data = await makeRequest(destination: url, method: "DELETE", body: nil, contentType: "application/json");
     if (data) == nil { return true; }
     return false;
 }
 
 func getVote(postId: Int) async -> Int {
-    let url = "https://\(source)/posts/\(postId)"
-    let data = await makeRequest(url: url, method: "GET", body: nil, contentType: "text/html");
+    let url = "/posts/\(postId)"
+    let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "text/html");
     if (data == nil) { return 0; }
     do {
         let textContent = String(data: data!, encoding: .utf8) ?? ""
@@ -118,44 +124,47 @@ func getVote(postId: Int) async -> Int {
 }
 
 func votePost(postId: Int, value: Int, no_unvote: Bool) async -> Int {
-    let url = "https://\(source)/posts/\(postId)/votes.json"
-    let data = await makeRequest(url: url, method: "POST", body: "score=\(value)&no_unvote=\(no_unvote)".data(using: .utf8), contentType: "application/x-www-form-urlencoded");
+    let url = "/posts/\(postId)/votes.json"
+    let data = await makeRequest(destination: url, method: "POST", body: "score=\(value)&no_unvote=\(no_unvote)".data(using: .utf8), contentType: "application/x-www-form-urlencoded");
     if (data == nil) { return 0; }
     do {
         let json = try JSONDecoder().decode(VoteResponse.self, from: data!);
-        print(json)
+        //os_log("%{public}@", log: .default, json);
         return json.our_score ?? 0
     }
     catch {
-        print("Error decoding vote response: \(error)")
+        //os_log("Error decoding vote response: %{public}s", log: .default, error);
         return 0
     }
 }
 
-func makeRequest(url: String, method: String, body: Data?, contentType: String) async -> Data? {
-    let url = URL(string: url)
+func makeRequest(destination: String, method: String, body: Data?, contentType: String) async -> Data? {
+    let domain = UserDefaults.standard.string(forKey: "api_source") ?? "e926.net";
+    let API_KEY = UserDefaults.standard.string(forKey: "API_KEY") ?? "";
+    let username = UserDefaults.standard.string(forKey: "username") ?? "";
+    let AUTH_STRING: String = "\(username):\(API_KEY)".data(using: .utf8)?.base64EncodedString() ?? "";
+    let url = URL(string: "https://\(domain)\(destination)")
+
     var request = URLRequest(url: url!)
     request.httpMethod = method
     request.addValue(contentType, forHTTPHeaderField: "Content-Type")
     request.addValue(userAgent, forHTTPHeaderField: "User-Agent")
+
     if ![API_KEY, username].contains("") {
         request.addValue("Basic \(AUTH_STRING)", forHTTPHeaderField: "Authorization")
     }
-    print("Making request to \(url!)")
-    print("Method: \(method)")
-    print("Body: \(body?.debugDescription ?? "")")
-    print("contentType: \(contentType)")
+
     do {
         if (body != nil && method != "GET") {
             request.httpBody = body!
         }
         let (data, response) = try await URLSession.shared.data(for: request);
-        //print(response)
-        return data;
         
+        os_log("HTTP %{public}s %{public}d https://%{public}s%{public}s", log: .default, method, response.getStatusCode() ?? -1, domain, destination)
+        return data;
     } catch {
         DispatchQueue.main.async {
-            print("Failed to make request: \(error)")
+            os_log("Failed to make request: %{public}s", log: .default, error.localizedDescription);
         }
         return nil
     }
