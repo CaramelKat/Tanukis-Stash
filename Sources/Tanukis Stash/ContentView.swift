@@ -6,13 +6,12 @@
 //
 
 import SwiftUI
-let defaults = UserDefaults.standard
 
 struct ContentView: View {
-    
+
     var body: some View {
         NavigationStack {
-            SearchView(search: "");
+            SearchView(search: "", isTopView: true)
         }
     }
 }

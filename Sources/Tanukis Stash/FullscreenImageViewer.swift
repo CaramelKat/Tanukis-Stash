@@ -13,12 +13,14 @@ public struct FullscreenImageViewer: View {
     @State var post: PostContent
     
     public var body: some View {
-        ZoomableContainer {
-            ImageView(post: post, isFullScreen: true)
-                .frame(minWidth: 0, maxWidth: .greatestFiniteMagnitude, minHeight: 0, maxHeight: .greatestFiniteMagnitude)
+        GeometryReader {geometry in
+            ZoomableContainer {
+                MediaView(post: post, geometry: geometry, isFullScreen: true)
+                    .frame(minWidth: 0, maxWidth: .greatestFiniteMagnitude, minHeight: 0, maxHeight: .greatestFiniteMagnitude)
+            }
+            .navigationBarItems(trailing: Button("Dismiss", action: {
+                self.presentationMode.wrappedValue.dismiss()
+            }))
         }
-        .navigationBarItems(trailing: Button("Dismiss", action: {
-            self.presentationMode.wrappedValue.dismiss()
-        }))
     }
 }

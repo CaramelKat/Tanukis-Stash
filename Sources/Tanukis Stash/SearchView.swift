@@ -12,26 +12,38 @@ struct SearchView: View {
     @State var searchSuggestions = [String]();
     @State var search: String;
     @State var page = 1;
-    @State var source = defaults.string(forKey: "api_source") ?? "e926.net";
-    @State var showSettings = false
+    @State var showSettings = false;
+    @Environment(\.dismiss) private var dismiss;
+    @Environment(\.dismissSearch) private var dismissSearch;
     
+    let fuckSearchableViewModel = SearchableViewModel();
+    var isTopView: Bool = false
+
+    @State var infoText: String = ""
+
     var limit = 75;
     var vGridLayout = [
         GridItem(.flexible(minimum: 75)),
         GridItem(.flexible()),
         GridItem(.flexible())
     ]
+
+    var loadingText = "Loading posts...";
+    var noPostsFoundText = "No posts found";
     
     var body: some View {
         ScrollView(.vertical) {
+            if(posts.count == 0) {
+                ProgressView(infoText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
             LazyVGrid(columns: vGridLayout) {
                 ForEach(Array(posts.enumerated()), id: \.element) { i, post in
                     PostPreviewFrame(post: post, search: search)
                     .onAppear {
                         if (i == posts.count - 9) {
                             Task.init {
-                                page += 1;
-                                posts += await fetchMoreRecentPosts(page, limit, search);
+                                await getPosts(append: true);
                             }
                         }
                     }
@@ -40,21 +52,22 @@ struct SearchView: View {
             .padding(10)
         }.task {
             if($posts.count == 0) {
-                posts = await fetchRecentPosts(1, 28, search)
+                await getPosts(append: false);
             }
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink(destination: SearchView(search: String("fav:\(defaults.string(forKey: "username") ?? "default")"))) {
+                NavigationLink(destination: SearchView(search: String("fav:\(UserDefaults.standard.string(forKey: "username") ?? "default")"))) {
                     Image(systemName: "heart").imageScale(.large)
                 }
             }
-            
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    self.showSettings = true
-                }) {
-                    Image(systemName: "person.crop.circle").imageScale(.large)
+            if (isTopView) {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        self.showSettings = true
+                    }) {
+                        Image(systemName: "person.crop.circle").imageScale(.large)
+                    }
                 }
             }
         }
@@ -73,18 +86,20 @@ struct SearchView: View {
         }
         .textInputAutocapitalization(.never)
         .onChange(of: search) { newQuery in
-            Task.init { if(search.count >= 3) {
-                Task.init {
-                    searchSuggestions = await createTagList(search);
-               }
-           } }
+            Task.init { 
+                if(search.count >= 3) {
+                    Task.init {
+                        searchSuggestions = await createTagList(search);
+                    }
+                } 
+           }
                    }
         .onSubmit(of: .search) {
             posts = [];
             Task.init {
-                page = 1;
-                posts = await fetchRecentPosts(page, limit, search)
+                await getPosts(append: false);
                 searchSuggestions.removeAll();
+                dismissSearch()
             }
         }
         .onChange(of: showSettings, perform: {showSettings in
@@ -99,14 +114,18 @@ struct SearchView: View {
         }
     }
     
-    func checkRefresh(_ id: Int) -> Bool{
-        if(posts.count > 25) {
-            let element = posts[posts.count - 25];
-            return element.id == id;
+    func getPosts(append: Bool) async {
+        infoText = loadingText;
+        if(append) {
+            page += 1;
+            posts += await fetchRecentPosts(page, limit, search)
+        } else {
+            page = 1;
+            posts = await fetchRecentPosts(page, limit, search)
         }
-        else {
-            let element = posts.last;
-            return element?.id == id;
+        
+        if (posts.count == 0) {
+            infoText = noPostsFoundText
         }
     }
     
@@ -123,13 +142,13 @@ struct SearchView: View {
     func updateSettings() {
         showSettings = !showSettings;
         if(showSettings) {
-            source = defaults.string(forKey: "api_source") ?? "e926.net";
             if(posts.count == 0) {
                 posts = [];
                 Task.init {
-                    page = 1;
-                    posts = await fetchRecentPosts(page, limit, search)
+                    await getPosts(append: false);
                     searchSuggestions.removeAll();
+                    dismiss()
+                    dismissSearch()
                 }
             }
         }
@@ -139,6 +158,23 @@ struct SearchView: View {
 struct SearchView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+    }
+}
+
+class SearchableViewModel: ObservableObject {
+    var dismissClosure: () -> Void = { print("Not Set") }
+}
+
+struct SearchableViewPassthrough: ViewModifier {
+    @Environment(\.isSearching) var isSearching
+    @Environment(\.dismissSearch) var dismissSearch
+    let viewModel: SearchableViewModel
+
+    func body(content: Content) -> some View {
+        content
+        .onAppear {
+            viewModel.dismissClosure = { dismissSearch() }
+        }
     }
 }
 
@@ -174,7 +210,7 @@ struct PostPreviewFrame: View {
                 VStack() {
                     Spacer()
                     HStack(alignment: .bottom) {
-                        Text("⬆️\(post.score.total) ❤️\(post.fav_count)")
+                        Text("⬆️\(post.score.total.formatted(.number.notation(.compactName))) ❤️\(post.fav_count.formatted(.number.notation(.compactName)))")
                             .font(.system(size: 12))
                             .fontWeight(.bold)
                             .foregroundColor(Color.white)
