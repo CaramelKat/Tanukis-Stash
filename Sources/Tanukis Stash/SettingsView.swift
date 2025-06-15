@@ -110,12 +110,7 @@ struct SettingsView: View {
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")
                             .foregroundColor(.secondary)
                     }
-                    HStack {
-                        Text("Build")
-                        Spacer()
-                        Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
-                            .foregroundColor(.secondary)
-                    }
+                    Link("Visit GitHub", destination: URL(string: "https://github.com/CaramelKat/Tanukis-Stash/releases/latest")!)
                 }
             }
             .navigationBarTitle("Settings", displayMode: .inline)
