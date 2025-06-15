@@ -38,6 +38,83 @@ func login() async -> Bool {
     return true;
 }
 
+func areTagsBlacklisted(blacklistedArray: [String], postTags: [String]) -> Bool {
+    for tag in blacklistedArray {
+         // Each line in the blacklist can contain multiple tags separated by spaces, if post contains all of them, it is blacklisted
+        let blacklistLineTags = tag.split(separator: " ").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        let blacklistLineTagsSet = Set(blacklistLineTags)
+        let postTagsSet = Set(postTags.map { $0.lowercased() })
+        // Check if the post tags contain all the blacklisted tags in this line
+        if blacklistLineTagsSet.isSubset(of: postTagsSet) {
+            os_log("Post is blacklisted due to tags: %{public}s", log: .default, tag);
+            return true;
+        }
+    }
+    return false
+
+}
+
+func isPostBlacklisted(_ post: PostContent) async -> Bool {
+    let blacklistedTags = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
+    if (blacklistedTags == "No Auth" || blacklistedTags == "Bad usrdata") {
+        return false;
+    }
+    // Split the blacklisted tags into an array
+    let blacklistedArray = blacklistedTags.lowercased().split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+    var allPostTags = post.tags.general
+
+    allPostTags.append(contentsOf: post.tags.species) 
+    allPostTags.append(contentsOf: post.tags.character) 
+    allPostTags.append(contentsOf: post.tags.copyright) 
+    allPostTags.append(contentsOf: post.tags.artist) 
+    allPostTags.append(contentsOf: post.tags.invalid) 
+    allPostTags.append(contentsOf: post.tags.lore)
+    allPostTags.append(contentsOf: post.tags.meta)
+
+    // Get post rating and convert it to a tag
+    switch post.rating {
+        case "s":
+            allPostTags.append("rating:safe")
+        case "q":
+            allPostTags.append("rating:questionable")
+        case "e":
+            allPostTags.append("rating:explicit")
+        default:
+            os_log("Unknown rating %{public}s for post %{public}d", log: .default, post.rating, post.id);
+    }
+
+    return areTagsBlacklisted(blacklistedArray: blacklistedArray, postTags: allPostTags)
+}
+
+func fetchUserData() async -> UserData? {
+    let username = UserDefaults.standard.string(forKey: "username") ?? "";
+    let url = "/users/\(username).json"
+    do {
+        let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+        if (data) == nil { return nil; }
+        let userData = try JSONDecoder().decode(UserData.self, from: data!);
+        return userData;
+    } catch {
+        os_log("Error fetching user data: %{public}s", log: .default, error.localizedDescription);
+        return nil;
+    }
+}
+
+func fetchBlacklist() async -> String {
+    let authenticated = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
+    if (!authenticated) {
+        os_log("Not authenticated, skipping blacklist update", log: .default);
+        return "No Auth";
+    }
+    let userdata = await fetchUserData();
+    if (userdata == nil) {
+        os_log("Failed to fetch user data", log: .default);
+        return "Bad usrdata";
+    }
+    let data = userdata!.blacklisted_tags;
+    return data;
+}
+
 func fetchTags(_ text: String) async -> [String] {
     do {
         let encoded: String? = text.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
@@ -45,7 +122,7 @@ func fetchTags(_ text: String) async -> [String] {
 
         let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
         if (data) == nil { return []; }
-        let tags = try JSONDecoder().decode([TagContent].self, from: data!)
+        let tags: [TagContent] = try JSONDecoder().decode([TagContent].self, from: data!)
         return await processTags(tags);
     } catch {
         //os_log("%{public}s", log: .default, error);
@@ -85,7 +162,7 @@ func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostC
         let username = UserDefaults.standard.string(forKey: "username") ?? "";
         let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
         let url: String;
-        os_log("%{public}s %{public}s", log: .default, tags, "fav:\(username)");
+
         if (tags == "fav:\(username)") {
             url = "/favorites.json?limit=\(limit)&page=\(page)"
         } else {
@@ -93,14 +170,25 @@ func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostC
         }
 
         let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
-        os_log("Data recieved?", log: .default);
+
         if (data) == nil { 
             os_log("Failed to fetch posts", log: .default);
             return []; 
         }
-        os_log("Not nil, let's unpack", log: .default);
-        let parsedData = try JSONDecoder().decode(Posts.self, from: data!)
-        os_log("Unpacked", log: .default);
+
+        let parsedData: Posts = try JSONDecoder().decode(Posts.self, from: data!)
+
+        // If the blacklist is enabled, filter out blacklisted posts
+        if (UserDefaults.standard.bool(forKey: "ENABLE_BLACKLIST")) {
+            var filteredPosts = [PostContent]()
+            for post in parsedData.posts {
+                if !(await isPostBlacklisted(post)) {
+                    filteredPosts.append(post)
+                }
+            }
+            return filteredPosts
+        }
+
         return parsedData.posts;
     } catch {
         os_log("Error! %{public}@", log: .default, String(describing: error));

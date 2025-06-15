@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var selection: String = UserDefaults.standard.string(forKey: "api_source") ?? "e621.net";
     @State private var API_KEY: String = UserDefaults.standard.string(forKey: "API_KEY") ?? "";
     @State private var ENABLE_AIRPLAY: Bool = UserDefaults.standard.bool(forKey: "ENABLE_AIRPLAY");
+    @State private var ENABLE_BLACKLIST: Bool = UserDefaults.standard.bool(forKey: "ENABLE_BLACKLIST");
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     let sources = ["e926.net", "e621.net"];
     
@@ -53,6 +54,11 @@ struct SettingsView: View {
                         .onChange(of: ENABLE_AIRPLAY, perform: {newValue in
                             UserDefaults.standard.set(newValue, forKey: "ENABLE_AIRPLAY");
                         })
+                    Toggle("Enable Blacklist", isOn: $ENABLE_BLACKLIST)
+                        .toggleStyle(.switch)
+                        .onChange(of: ENABLE_BLACKLIST, perform: {newValue in
+                            UserDefaults.standard.set(newValue, forKey: "ENABLE_BLACKLIST");
+                        })
                 }
 
                 Section(header: Text("App Information")) {
@@ -89,6 +95,7 @@ struct LoginButton: View {
     @Binding var username: String
     @Binding var API_KEY: String
     @State private var ShowAlert: Bool = false;
+    @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
     
     var body: some View {
         if (AUTHENTICATED) {
@@ -106,6 +113,11 @@ struct LoginButton: View {
                     if (!AUTHENTICATED) {
                         ShowAlert.toggle()
                     }
+                    if (AUTHENTICATED) {
+                        // Fetch user data and blacklist if login is successful
+                        BLACKLIST = await fetchBlacklist();
+                        UserDefaults.standard.set(BLACKLIST.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "USER_BLACKLIST");
+                    }
                 }
             }
             .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || API_KEY.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -120,9 +132,20 @@ struct LoginButton: View {
 }
 
 struct UserSettingsView: View {
-    @State private var text: String = UserDefaults.standard.string(forKey: "text") ?? "";
+    @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
+    @State private var username: String = UserDefaults.standard.string(forKey: "username") ?? "";
+    @State private var selection: String = UserDefaults.standard.string(forKey: "api_source") ?? "e621.net";
     
     var body: some View {
-        TextField("Blacklist", text: $text,  axis: .vertical)
+        TextField("Blacklist", text: $BLACKLIST,  axis: .vertical)
+        .disabled(true)
+        .foregroundStyle(.gray)
+        .onAppear {
+            Task {
+                BLACKLIST = await fetchBlacklist();
+                UserDefaults.standard.set(BLACKLIST.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "USER_BLACKLIST");
+            }
+        }
+        Link("Edit User Settings", destination: URL(string: "https://\(selection)/users/\(username)/edit?tab=blacklist")!)
     }
 }

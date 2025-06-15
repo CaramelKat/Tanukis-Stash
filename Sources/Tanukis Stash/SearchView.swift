@@ -31,6 +31,11 @@ struct SearchView: View {
 
     var loadingText = "Loading posts...";
     var noPostsFoundText = "No posts found";
+
+    init(search: String, isTopView: Bool = false) {
+        self.search = search;
+        self.isTopView = isTopView; 
+    }
     
     var body: some View {
         ScrollView(.vertical) {
@@ -51,11 +56,12 @@ struct SearchView: View {
                 }
             }
             .padding(10)
-        }.task {
-            if($posts.count == 0) {
+        }
+        .task({
+            if (posts.count == 0) {
                 await getPosts(append: false);
             }
-        }
+        })
         .toolbar {
             if (AUTHENTICATED) {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -157,12 +163,6 @@ struct SearchView: View {
                 }
             }
         }
-    }
-}
-
-struct SearchView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
     }
 }
 
