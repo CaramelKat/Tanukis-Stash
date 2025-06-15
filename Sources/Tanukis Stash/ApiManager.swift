@@ -157,6 +157,20 @@ func createTagList(_ search: String) async -> [String] {
     return []
 }
 
+func getPost(postId: Int) async -> PostContent? {
+    let url = "/posts/\(postId).json"
+    do {
+        let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+        if (data) == nil { return nil; }
+        let post: Post = try JSONDecoder().decode(Post.self, from: data!);
+        // If the blacklist is enabled, check if the post is blacklisted
+        return post.post;
+    } catch {
+        os_log("Error fetching post %{public}d: %{public}s", log: .default, postId, error.localizedDescription);
+        return nil;
+    }
+}
+
 func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostContent] {
     do {
         let username = UserDefaults.standard.string(forKey: "username") ?? "";

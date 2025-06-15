@@ -17,16 +17,49 @@ struct SettingsView: View {
     @State private var ENABLE_AIRPLAY: Bool = UserDefaults.standard.bool(forKey: "ENABLE_AIRPLAY");
     @State private var ENABLE_BLACKLIST: Bool = UserDefaults.standard.bool(forKey: "ENABLE_BLACKLIST");
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
+    @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "BLACKLIST") ?? "";
+    @State private var userIcon: String? = nil;
     let sources = ["e926.net", "e621.net"];
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Account")) {
-                    TextField("Username", text: $username).onDisappear() {
-                        UserDefaults.standard.set(username.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "username");
-                    }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
-                    if (!AUTHENTICATED) {
+                    if (AUTHENTICATED) {
+                        HStack {
+                            if let userIcon = userIcon {
+                                AsyncImage(url: URL(string: userIcon)) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .clipped()
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+                                } placeholder: {
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+                                }
+                            } else {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(Circle())
+                            }
+                            Text(username.isEmpty ? "Username" : username)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Spacer()
+                                
+                        }
+                    } else {
+                        TextField("Username", text: $username).onDisappear() {
+                            UserDefaults.standard.set(username.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "username");
+                        }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
+                        
                         TextField("API Key", text: $API_KEY).onDisappear() {
                             UserDefaults.standard.set(API_KEY.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "API_KEY");
                         }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
@@ -36,7 +69,16 @@ struct SettingsView: View {
 
                 if (AUTHENTICATED) {
                     Section(header: Text("User Settings")) {
-                        UserSettingsView()
+                        TextField("Blacklist", text: $BLACKLIST,  axis: .vertical)
+                        .disabled(true)
+                        .foregroundStyle(.gray)
+                        .onAppear {
+                            Task {
+                                BLACKLIST = await fetchBlacklist();
+                                UserDefaults.standard.set(BLACKLIST, forKey: "USER_BLACKLIST");
+                            }
+                        }
+                        Link("Edit User Settings", destination: URL(string: "https://\(selection)/users/\(username)/edit?tab=blacklist")!)
                     }
                 }
                 Section(header: Text("App Settings")) {
@@ -80,6 +122,31 @@ struct SettingsView: View {
             .navigationBarItems(trailing: Button("Dismiss", action: {
                 self.presentationMode.wrappedValue.dismiss()
             }))
+            .onAppear {
+                Task {
+                    await getUserIcon()
+                }
+            }
+            .refreshable {
+                BLACKLIST = await fetchBlacklist();
+                UserDefaults.standard.set(BLACKLIST, forKey: "USER_BLACKLIST");
+            }
+        }
+    }
+
+    func getUserIcon() async {
+        guard let userData = await fetchUserData() else { return }
+        guard let avatarPostId: Int? = userData.avatar_id else { return }
+        guard let post = await getPost(postId: avatarPostId!) else { return }
+        if ["gif", "webm", "mp4"].contains(post.file.ext) {
+            // If the avatar is a video or gif, use the preview image instead
+            userIcon = post.preview.url!
+        } else if post.file.url == nil {
+            // If the file URL is nil, use the preview URL
+            userIcon = post.preview.url!
+        } else {
+            // Otherwise, use the file URL
+            userIcon = post.file.url!
         }
     }
 }
@@ -116,7 +183,7 @@ struct LoginButton: View {
                     if (AUTHENTICATED) {
                         // Fetch user data and blacklist if login is successful
                         BLACKLIST = await fetchBlacklist();
-                        UserDefaults.standard.set(BLACKLIST.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "USER_BLACKLIST");
+                        UserDefaults.standard.set(BLACKLIST, forKey: "USER_BLACKLIST");
                     }
                 }
             }
@@ -128,24 +195,5 @@ struct LoginButton: View {
                 )
             }
         }
-    }
-}
-
-struct UserSettingsView: View {
-    @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
-    @State private var username: String = UserDefaults.standard.string(forKey: "username") ?? "";
-    @State private var selection: String = UserDefaults.standard.string(forKey: "api_source") ?? "e621.net";
-    
-    var body: some View {
-        TextField("Blacklist", text: $BLACKLIST,  axis: .vertical)
-        .disabled(true)
-        .foregroundStyle(.gray)
-        .onAppear {
-            Task {
-                BLACKLIST = await fetchBlacklist();
-                UserDefaults.standard.set(BLACKLIST.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "USER_BLACKLIST");
-            }
-        }
-        Link("Edit User Settings", destination: URL(string: "https://\(selection)/users/\(username)/edit?tab=blacklist")!)
     }
 }
