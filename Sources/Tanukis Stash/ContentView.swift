@@ -9,17 +9,19 @@ import SwiftUI
 
 struct ContentView: View {
 
+    init() {
+        Task.init {
+            let loginStatus = await login();
+            UserDefaults.standard.set(loginStatus, forKey: "AUTHENTICATED");
+            if (loginStatus) {
+                UserDefaults.standard.set(await fetchBlacklist().trimmingCharacters(in: .whitespacesAndNewlines), forKey: "USER_BLACKLIST");
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             SearchView(search: "", isTopView: true)
-        }.task {
-            UserDefaults.standard.set(await login(), forKey: "AUTHENTICATED");
         }
-    }
-}
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
     }
 }
