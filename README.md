@@ -1,7 +1,7 @@
 # The Tanuki's Stash
 <div style="display:flex;">
     <a><img src="https://img.shields.io/badge/Swift-FA7343?style=for-the-badge&logo=swift&logoColor=white"></a>
-    <a href="https://twitter.com/JayDaBirb"><img src="https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white"></a>
+    <a href="https://jem.tanuk.us"><img src="https://img.shields.io/badge/Bluesky-0085ff?style=for-the-badge&logo=bluesky&logoColor=white"></a>
 </div>
 <br>
 
