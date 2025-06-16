@@ -17,32 +17,25 @@ struct SettingsView: View {
     @State private var ENABLE_AIRPLAY: Bool = UserDefaults.standard.bool(forKey: "ENABLE_AIRPLAY");
     @State private var ENABLE_BLACKLIST: Bool = UserDefaults.standard.bool(forKey: "ENABLE_BLACKLIST");
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
-    @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "BLACKLIST") ?? "";
-    @State private var userIcon: String? = nil;
+    @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
+    @State private var USER_ICON: String = UserDefaults.standard.string(forKey: "USER_ICON") ?? "";
+
     let sources = ["e926.net", "e621.net"];
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Account")) {
+                Section(header: Text("User Settings")) {
                     if (AUTHENTICATED) {
                         HStack {
-                            if let userIcon = userIcon {
-                                AsyncImage(url: URL(string: userIcon)) { image in
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                        .clipped()
-                                        .frame(width: 50, height: 50)
-                                        .clipShape(Circle())
-                                } placeholder: {
-                                    Image(systemName: "person.crop.circle.fill")
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 50, height: 50)
-                                        .clipShape(Circle())
-                                }
-                            } else {
+                            AsyncImage(url: URL(string: USER_ICON)) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .clipped()
+                                    .frame(width: 50, height: 50)
+                                    .clipShape(Circle())
+                            } placeholder: {
                                 Image(systemName: "person.crop.circle.fill")
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
@@ -65,11 +58,7 @@ struct SettingsView: View {
                         }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
                     }
                     LoginButton(AUTHENTICATED: $AUTHENTICATED, username: $username, API_KEY: $API_KEY)
-                }
-
-                if (AUTHENTICATED) {
-                    Section(header: Text("User Settings")) {
-                        TextField("Blacklist", text: $BLACKLIST,  axis: .vertical)
+                    TextField("Blacklist", text: $BLACKLIST,  axis: .vertical)
                         .disabled(true)
                         .foregroundStyle(.gray)
                         .onAppear {
@@ -79,8 +68,8 @@ struct SettingsView: View {
                             }
                         }
                         Link("Edit User Settings", destination: URL(string: "https://\(selection)/users/\(username)/edit?tab=blacklist")!)
-                    }
                 }
+
                 Section(header: Text("App Settings")) {
                     Picker("API Source", selection: $selection) {
                         ForEach(sources, id: \.self) {
@@ -88,19 +77,21 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .onChange(of: selection, perform: {newValue in
-                        UserDefaults.standard.set(newValue, forKey: "api_source");
-                    })
+                    .onChange(of: selection) {
+                        UserDefaults.standard.set(selection, forKey: "api_source");
+                    }
                     Toggle("Enable AirPlay", isOn: $ENABLE_AIRPLAY)
                         .toggleStyle(.switch)
-                        .onChange(of: ENABLE_AIRPLAY, perform: {newValue in
-                            UserDefaults.standard.set(newValue, forKey: "ENABLE_AIRPLAY");
-                        })
-                    Toggle("Enable Blacklist", isOn: $ENABLE_BLACKLIST)
-                        .toggleStyle(.switch)
-                        .onChange(of: ENABLE_BLACKLIST, perform: {newValue in
-                            UserDefaults.standard.set(newValue, forKey: "ENABLE_BLACKLIST");
-                        })
+                        .onChange(of: ENABLE_AIRPLAY) {
+                            UserDefaults.standard.set(ENABLE_AIRPLAY, forKey: "ENABLE_AIRPLAY");
+                        }
+                    if (AUTHENTICATED) {
+                        Toggle("Enable Blacklist", isOn: $ENABLE_BLACKLIST)
+                            .toggleStyle(.switch)
+                            .onChange(of: ENABLE_BLACKLIST) {
+                                UserDefaults.standard.set(ENABLE_BLACKLIST, forKey: "ENABLE_BLACKLIST");
+                            }
+                    }
                 }
 
                 Section(header: Text("App Information")) {
@@ -131,18 +122,19 @@ struct SettingsView: View {
 
     func getUserIcon() async {
         guard let userData = await fetchUserData() else { return }
-        guard let avatarPostId: Int? = userData.avatar_id else { return }
+        let avatarPostId: Int? = userData.avatar_id
         guard let post = await getPost(postId: avatarPostId!) else { return }
         if ["gif", "webm", "mp4"].contains(post.file.ext) {
             // If the avatar is a video or gif, use the preview image instead
-            userIcon = post.preview.url!
+            USER_ICON = post.preview.url!
         } else if post.file.url == nil {
             // If the file URL is nil, use the preview URL
-            userIcon = post.preview.url!
+            USER_ICON = post.preview.url!
         } else {
             // Otherwise, use the file URL
-            userIcon = post.file.url!
+            USER_ICON = post.file.url!
         }
+        UserDefaults.standard.set(USER_ICON, forKey: "USER_ICON");
     }
 }
 

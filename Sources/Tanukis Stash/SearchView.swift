@@ -94,7 +94,7 @@ struct SearchView: View {
             //}
         }
         .textInputAutocapitalization(.never)
-        .onChange(of: search) { newQuery in
+        .onChange(of: search) {
             Task.init { 
                 if(search.count >= 3) {
                     Task.init {
@@ -102,7 +102,7 @@ struct SearchView: View {
                     }
                 } 
            }
-                   }
+        }
         .onSubmit(of: .search) {
             posts = [];
             Task.init {
@@ -111,9 +111,9 @@ struct SearchView: View {
                 dismissSearch()
             }
         }
-        .onChange(of: showSettings, perform: {showSettings in
+        .onChange(of: showSettings) {
             updateSettings();
-        })
+        }
         .sheet(isPresented: $showSettings, content: {
             SettingsView()
         })
