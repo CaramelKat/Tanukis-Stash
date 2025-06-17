@@ -12,7 +12,7 @@ struct SettingsView: View {
     @Environment(\.presentationMode)
     var presentationMode: Binding<PresentationMode>
     @State private var username: String = UserDefaults.standard.string(forKey: "username") ?? "";
-    @State private var selection: String = UserDefaults.standard.string(forKey: "api_source") ?? "e621.net";
+    @State private var selection: String = UserDefaults.standard.string(forKey: "api_source") ?? "e926.net";
     @State private var API_KEY: String = UserDefaults.standard.string(forKey: "API_KEY") ?? "";
     @State private var ENABLE_AIRPLAY: Bool = UserDefaults.standard.bool(forKey: "ENABLE_AIRPLAY");
     @State private var ENABLE_BLACKLIST: Bool = UserDefaults.standard.bool(forKey: "ENABLE_BLACKLIST");
@@ -25,7 +25,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("User Settings")) {
+                Section(header: Text("Account")) {
                     if (AUTHENTICATED) {
                         HStack {
                             AsyncImage(url: URL(string: USER_ICON)) { image in
@@ -58,16 +58,21 @@ struct SettingsView: View {
                         }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
                     }
                     LoginButton(AUTHENTICATED: $AUTHENTICATED, username: $username, API_KEY: $API_KEY)
-                    TextField("Blacklist", text: $BLACKLIST,  axis: .vertical)
-                        .disabled(true)
-                        .foregroundStyle(.gray)
-                        .onAppear {
-                            Task {
-                                BLACKLIST = await fetchBlacklist();
-                                UserDefaults.standard.set(BLACKLIST, forKey: "USER_BLACKLIST");
-                            }
+                }
+
+                if (AUTHENTICATED) {
+                    Section(header: Text("Blacklist")) {
+                            TextField("Blacklist", text: $BLACKLIST,  axis: .vertical)
+                                .disabled(true)
+                                .foregroundStyle(.gray)
+                                .onAppear {
+                                    Task {
+                                        BLACKLIST = await fetchBlacklist();
+                                        UserDefaults.standard.set(BLACKLIST, forKey: "USER_BLACKLIST");
+                                    }
+                                }
+                            Link("Edit User Settings", destination: URL(string: "https://\(selection)/users/\(username)/edit?tab=blacklist")!)
                         }
-                        Link("Edit User Settings", destination: URL(string: "https://\(selection)/users/\(username)/edit?tab=blacklist")!)
                 }
 
                 Section(header: Text("App Settings")) {
