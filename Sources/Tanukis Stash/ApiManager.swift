@@ -230,10 +230,10 @@ func getVote(postId: Int) async -> Int {
     if (data == nil) { return 0; }
     do {
         let textContent = String(data: data!, encoding: .utf8) ?? ""
-        if textContent.contains("post-vote-up-\(postId) score-positive") {
+        if textContent.contains("data-vote=\"1\"") {
             return 1
         }
-        else if textContent.contains("post-vote-down-\(postId) score-negative") {
+        else if textContent.contains("data-vote=\"-1\"") {
             return -1
         }
         return 0
