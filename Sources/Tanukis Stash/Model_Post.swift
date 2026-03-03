@@ -12,7 +12,7 @@ struct PostContent: Decodable, Hashable {
     static func == (lhs: PostContent, rhs: PostContent) -> Bool {
         return lhs.id == rhs.id
     }
-    
+
     let id: Int;
     let created_at: String;
     let updated_at: String;

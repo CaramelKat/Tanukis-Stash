@@ -16,7 +16,7 @@ struct SearchView: View {
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     @Environment(\.dismiss) private var dismiss;
     @Environment(\.dismissSearch) private var dismissSearch;
-    
+
     let fuckSearchableViewModel = SearchableViewModel();
     var isTopView: Bool = false
 
@@ -36,7 +36,7 @@ struct SearchView: View {
         self.search = search;
         self.isTopView = isTopView; 
     }
-    
+
     var body: some View {
         ScrollView(.vertical) {
             if(posts.count == 0) {

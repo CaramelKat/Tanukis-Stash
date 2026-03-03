@@ -21,7 +21,7 @@ struct PostView: View {
     private var tapGesture: some Gesture {
         !["webm", "mp4"].contains(String(post.file.ext)) ? (TapGesture().onEnded { showImageViewer = true }) : nil
     }
-    
+
     var body: some View {
         GeometryReader {geometry in
             ZStack(alignment: .bottom) {

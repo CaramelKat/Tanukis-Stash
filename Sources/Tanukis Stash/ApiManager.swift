@@ -63,11 +63,11 @@ func isPostBlacklisted(_ post: PostContent) async -> Bool {
     let blacklistedArray = blacklistedTags.lowercased().split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
     var allPostTags = post.tags.general
 
-    allPostTags.append(contentsOf: post.tags.species) 
-    allPostTags.append(contentsOf: post.tags.character) 
-    allPostTags.append(contentsOf: post.tags.copyright) 
-    allPostTags.append(contentsOf: post.tags.artist) 
-    allPostTags.append(contentsOf: post.tags.invalid) 
+    allPostTags.append(contentsOf: post.tags.species)
+    allPostTags.append(contentsOf: post.tags.character)
+    allPostTags.append(contentsOf: post.tags.copyright)
+    allPostTags.append(contentsOf: post.tags.artist)
+    allPostTags.append(contentsOf: post.tags.invalid)
     allPostTags.append(contentsOf: post.tags.lore)
     allPostTags.append(contentsOf: post.tags.meta)
 

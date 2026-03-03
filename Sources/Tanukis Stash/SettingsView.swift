@@ -21,11 +21,11 @@ struct SettingsView: View {
     @State private var USER_ICON: String = UserDefaults.standard.string(forKey: "USER_ICON") ?? "";
 
     let sources = ["e926.net", "e621.net"];
-    
+
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Account")) {
+                Section(header: Text("Account"), footer: AUTHENTICATED ? nil : Link("Get your API key here", destination: URL(string: "https://e621.net/api_keys")!)) {
                     if (AUTHENTICATED) {
                         HStack {
                             AsyncImage(url: URL(string: USER_ICON)) { image in
@@ -46,13 +46,12 @@ struct SettingsView: View {
                                 .font(.headline)
                                 .foregroundColor(.primary)
                             Spacer()
-                                
                         }
                     } else {
                         TextField("Username", text: $username).onDisappear() {
                             UserDefaults.standard.set(username.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "username");
                         }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
-                        
+
                         TextField("API Key", text: $API_KEY).onDisappear() {
                             UserDefaults.standard.set(API_KEY.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "API_KEY");
                         }.disabled(AUTHENTICATED).foregroundColor(AUTHENTICATED ? .gray : .primary);
