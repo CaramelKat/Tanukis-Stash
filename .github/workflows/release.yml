@@ -22,6 +22,16 @@ jobs:
       - name: Install iOS SDK
         run: xtool sdk install /Applications/Xcode.app --slim
 
+      - name: Set app version from tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a tag like v1.2.3, got $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          plutil -replace CFBundleShortVersionString -string "$version" Resources/Info.xml
+          test "$(plutil -extract CFBundleShortVersionString raw -o - Resources/Info.xml)" = "$version"
+
       - name: Build unsigned release IPA
         run: xtool dev build --configuration release --ipa
 
