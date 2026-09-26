@@ -224,6 +224,19 @@ func unFavoritePost(postId: Int) async -> Bool {
     return false;
 }
 
+func fetchComments(postId: Int) async -> [CommentContent] {
+    do {
+        let url: String = "/comments.json?search%5Bpost_id%5D=\(postId)"
+        let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+        if (data) == nil { return []; }
+        let parsedData = try JSONDecoder().decode([CommentContent].self, from: data!)
+        return parsedData;
+    } catch {
+        os_log("Error fetching comments: %{public}s", log: .default, error.localizedDescription);
+        return [];
+    }
+}
+
 func getVote(postId: Int) async -> Int {
     let url = "/posts/\(postId)"
     let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "text/html");

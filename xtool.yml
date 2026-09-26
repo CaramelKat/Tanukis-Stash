@@ -1,5 +1,4 @@
 version: 1
 bundleID: dev.jemsoftware.tanukistash
 iconPath: Resources/AppIconProd.png
-entitlementsPath: Resources/App.entitlements
 infoPath: Resources/Info.xml

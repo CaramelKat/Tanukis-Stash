@@ -36,6 +36,10 @@ struct PostContent: Decodable, Hashable {
     var is_favorited: Bool;
     let has_notes: Bool;
     let duration: Float?;
+
+    var isAnimated: Bool {
+        return ["gif", "webm", "mp4"].contains(file.ext) || tags.general.contains("animated");
+    }
 }
 
 struct File: Decodable, Hashable {

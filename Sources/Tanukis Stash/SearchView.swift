@@ -13,6 +13,7 @@ struct SearchView: View {
     @State var search: String;
     @State var page = 1;
     @State var showSettings = false;
+    @State var selectedPost: PostSelection?;
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     @Environment(\.dismiss) private var dismiss;
     @Environment(\.dismissSearch) private var dismissSearch;
@@ -45,7 +46,7 @@ struct SearchView: View {
             }
             LazyVGrid(columns: vGridLayout) {
                 ForEach(Array(posts.enumerated()), id: \.element) { i, post in
-                    PostPreviewFrame(post: post, search: search)
+                    PostPreviewFrame(post: post, search: search, selectedPost: $selectedPost, index: i)
                     .onAppear {
                         if (i == posts.count - 9) {
                             Task.init {
@@ -117,6 +118,11 @@ struct SearchView: View {
         .sheet(isPresented: $showSettings, content: {
             SettingsView()
         })
+        .fullScreenCover(item: $selectedPost, content: { selection in
+            NavigationStack {
+                PostView(posts: posts, currentIndex: selection.index, search: search)
+            }
+        })
         .refreshable {
             page = 1;
             posts = await fetchRecentPosts(page, limit, search)
@@ -183,13 +189,20 @@ struct SearchableViewPassthrough: ViewModifier {
     }
 }
 
+struct PostSelection: Identifiable {
+    let index: Int;
+    var id: Int { index }
+}
+
 struct PostPreviewFrame: View {
     @State var post: PostContent;
     @State var search: String;
+    @Binding var selectedPost: PostSelection?;
+    var index: Int;
     
     var body: some View {
         
-        NavigationLink(destination: PostView(post: post, search: search)) {
+        Button(action: { selectedPost = PostSelection(index: index) }) {
             ZStack {
                 if(post.preview.url != nil) {
                     AsyncImage(url: URL(string: post.preview.url!)) { image in
@@ -212,6 +225,20 @@ struct PostPreviewFrame: View {
                         .frame(height: 150)
                         .background(Color.gray.opacity(0.90))
                 }
+                if(post.isAnimated) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "film")
+                        Text(post.file.ext.uppercased())
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(Color.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(4)
+                }
                 VStack() {
                     Spacer()
                     HStack(alignment: .bottom) {
@@ -227,5 +254,6 @@ struct PostPreviewFrame: View {
             }.cornerRadius(10)
             .padding(0.1)
         }
+        .buttonStyle(.plain)
     }
 }

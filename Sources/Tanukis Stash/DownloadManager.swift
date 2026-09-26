@@ -166,7 +166,6 @@ func saveFile(post: PostContent, showToast: Binding<Int>) {
         return
     }
     if (String(post.file.ext) == "gif") {
-        var image: UIImage?
         let urlString = post.file.url
         
         let url = URL(string: urlString!)
@@ -175,7 +174,7 @@ func saveFile(post: PostContent, showToast: Binding<Int>) {
             let data = try? Data(contentsOf: url!) //make sure your image in this url does exist, otherwise unwrap in a if let check / try-catch
             
             DispatchQueue.main.async {
-                image = UIImage(data: data!)
+                let image = UIImage(data: data!)
                 if(image != nil) {
                     writeToPhotoAlbum(image: image!);
                     showToast.wrappedValue = 2 // Success
@@ -197,7 +196,6 @@ func saveFile(post: PostContent, showToast: Binding<Int>) {
         }
     }
     else if (!["gif", "webm", "mp4"].contains(String(post.file.ext))) {
-        var image: UIImage?
         let urlString = post.file.url
         
         let url = URL(string: urlString ?? "");
@@ -218,7 +216,7 @@ func saveFile(post: PostContent, showToast: Binding<Int>) {
                 return
             }
             DispatchQueue.main.async {
-                image = UIImage(data: data!)
+                let image = UIImage(data: data!)
                 if(image != nil) {
                     writeToPhotoAlbum(image: image!)
                     showToast.wrappedValue = 2 // Success
