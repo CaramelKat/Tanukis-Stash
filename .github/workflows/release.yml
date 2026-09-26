@@ -1,0 +1,38 @@
+name: Release iOS app
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xtool
+        run: |
+          brew tap xtool-org/tap
+          brew install --cask xtool-org/tap/xtool
+
+      - name: Install iOS SDK
+        run: xtool sdk install /Applications/Xcode.app --slim
+
+      - name: Build unsigned release IPA
+        run: xtool dev build --configuration release --ipa
+
+      - name: Stage release IPA
+        run: |
+          ipa=$(find xtool -maxdepth 1 -name '*.ipa' -print -quit)
+          test -n "$ipa"
+          mkdir -p dist
+          cp "$ipa" dist/Tanukis-Stash-unsigned.ipa
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/Tanukis-Stash-unsigned.ipa --generate-notes --verify-tag

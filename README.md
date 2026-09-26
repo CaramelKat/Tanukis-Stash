@@ -8,6 +8,9 @@ The worlds first e621 client for iOS, iPadOS, and macOS built with SwiftUI
 
 [Get the Latest Release Here](https://github.com/caramelkat/tanukis-stash/releases/latest)
 
+Pushing a tag beginning with `v` builds an iOS release IPA and publishes it to GitHub Releases.
+The IPA is unsigned and must be signed with your own provisioning profile before installation.
+
 ### Features
 - Infinite scrolling
 - Post details page
