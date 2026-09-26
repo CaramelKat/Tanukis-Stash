@@ -23,19 +23,27 @@ struct PostPageContent: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
-                MediaView(post: post, geometry: geometry, isActive: isActive)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .gesture(tapGesture)
-                ScrollView(.vertical) {
+            let mediaHeight = min(
+                geometry.size.height * 0.75,
+                geometry.size.width * CGFloat(max(post.file.height, 1)) / CGFloat(max(post.file.width, 1))
+            )
+            ScrollView(.vertical) {
+                VStack(spacing: 0) {
+                    MediaView(post: post, geometry: geometry, isActive: isActive)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: mediaHeight)
+                        .contentShape(Rectangle())
+                        .gesture(tapGesture)
                     VStack(spacing: 0) {
-                        HStack {
-                            Text(post.tags.artist.joined(separator: ", "));
-                            Spacer();
-                        }
-                        HStack {
-                            Text("\(post.rating) #\(String(post.id)) ⬆️\(post.score.total) ❤️\(post.fav_count)")
-                            Spacer()
+                        VStack {
+                            HStack {
+                                Text(post.tags.artist.joined(separator: ", "));
+                                Spacer();
+                            }
+                            HStack {
+                                Text("\(post.rating) #\(String(post.id)) ⬆️\(post.score.total) ❤️\(post.fav_count)")
+                                Spacer()
+                            }
                         }
                         .padding(10.0)
                         .background(Color.gray)
@@ -48,9 +56,8 @@ struct PostPageContent: View {
                     }
                     .padding(.top, 10)
                 }
-                .frame(maxHeight: geometry.size.height * 0.45)
-                .scrollBounceBehavior(.basedOnSize, axes: .vertical)
             }
+            .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         }
     }
 }
@@ -88,7 +95,15 @@ struct PostView: View {
                     posts: posts,
                     search: search,
                     currentIndex: $currentIndex,
-                    showImageViewer: $showImageViewer
+                    showImageViewer: $showImageViewer,
+                    onDismissDrag: { distance, ended in
+                        if ended {
+                            finishDismissDrag(distance: distance, height: geometry.size.height)
+                        } else {
+                            dismissOffset = distance
+                            dismissOpacity = 1 - min(1, distance / 600)
+                        }
+                    }
                 )
 
                 ActionBar(post: post, search: search, displayToastType: $displayToastType)
@@ -96,7 +111,6 @@ struct PostView: View {
             }
             .offset(y: dismissOffset)
             .opacity(dismissOpacity)
-            .simultaneousGesture(dismissGesture(geometry: geometry))
             .toast(isPresenting: Binding<Bool>(get: { displayToastType != 0 }, set: { _ in })) {
                 getToast()
             }
@@ -143,41 +157,21 @@ struct PostView: View {
         }
     }
 
-    func dismissGesture(geometry: GeometryProxy) -> AnyGesture<DragGesture.Value> {
-        buildDismissDrag(geometry: geometry)
-    }
-
-    func buildDismissDrag(geometry: GeometryProxy) -> AnyGesture<DragGesture.Value> {
-        AnyGesture(
-            DragGesture(minimumDistance: 12)
-                .onChanged { value in
-                    let v = value.translation.height
-                    let h = value.translation.width
-                    if (v > 0 && v > abs(h)) {
-                        dismissOffset = v
-                        dismissOpacity = 1 - min(1, v / 600)
-                    }
-                }
-                .onEnded { value in
-                    let v = value.translation.height
-                    let h = value.translation.width
-                    if (abs(h) > abs(v)) { return }
-                    if (v > 140) {
-                        withAnimation(.easeOut(duration: 0.22)) {
-                            dismissOffset = geometry.size.height
-                            dismissOpacity = 0
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                            dismiss()
-                        }
-                    } else {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            dismissOffset = 0
-                            dismissOpacity = 1
-                        }
-                    }
-                }
-        )
+    func finishDismissDrag(distance: CGFloat, height: CGFloat) {
+        if distance > 140 {
+            withAnimation(.easeOut(duration: 0.22)) {
+                dismissOffset = height
+                dismissOpacity = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                dismiss()
+            }
+        } else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                dismissOffset = 0
+                dismissOpacity = 1
+            }
+        }
     }
 
     func clearToast() {
@@ -201,10 +195,34 @@ struct PostView: View {
         case 1:
             clearToast()
             return AlertToast(type: .error(Color.red), title: "Failed to save")
+        case 3:
+            clearToast()
+            return AlertToast(type: .error(Color.red), title: "Photo library access denied")
         default:
             clearToast()
-            return AlertToast(type: .regular, title: "FUck")
+            return AlertToast(type: .regular, title: "Unknown error \(displayToastType)")
         }
+    }
+}
+
+final class PostHostingController: UIHostingController<PostPageContent> {
+    var dismissPan: UIPanGestureRecognizer?
+    private(set) weak var postScrollView: UIScrollView?
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard postScrollView == nil, let dismissPan,
+              let scrollView = firstScrollView(in: view) else { return }
+        scrollView.panGestureRecognizer.require(toFail: dismissPan)
+        postScrollView = scrollView
+    }
+
+    private func firstScrollView(in view: UIView) -> UIScrollView? {
+        if let scrollView = view as? UIScrollView { return scrollView }
+        for subview in view.subviews {
+            if let scrollView = firstScrollView(in: subview) { return scrollView }
+        }
+        return nil
     }
 }
 
@@ -213,6 +231,7 @@ struct PostPagerView: UIViewControllerRepresentable {
     var search: String
     @Binding var currentIndex: Int
     @Binding var showImageViewer: Bool
+    var onDismissDrag: (CGFloat, Bool) -> Void
 
     func makeUIViewController(context: Context) -> UIPageViewController {
         let options = [UIPageViewController.OptionsKey.interPageSpacing: 0]
@@ -223,7 +242,6 @@ struct PostPagerView: UIViewControllerRepresentable {
         )
         pageViewController.dataSource = context.coordinator
         pageViewController.delegate = context.coordinator
-        pageViewController.view.backgroundColor = .black
 
         if let initialPage = context.coordinator.makePage(at: currentIndex, isActive: true) {
             pageViewController.setViewControllers(
@@ -238,6 +256,10 @@ struct PostPagerView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ pageViewController: UIPageViewController, context: Context) {
         context.coordinator.parent = self
+        if let visible = pageViewController.viewControllers?.first,
+           context.coordinator.index(of: visible) == currentIndex {
+            return
+        }
         context.coordinator.syncCurrentPage(in: pageViewController)
     }
 
@@ -246,9 +268,9 @@ struct PostPagerView: UIViewControllerRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIGestureRecognizerDelegate {
         var parent: PostPagerView
-        private var pages: [Int: UIHostingController<PostPageContent>] = [:]
+        private var pages: [Int: PostHostingController] = [:]
 
         init(_ parent: PostPagerView) {
             self.parent = parent
@@ -269,10 +291,44 @@ struct PostPagerView: UIViewControllerRepresentable {
                 existing.rootView = makeContent(index: index, isActive: isActive)
                 return existing
             }
-            let hostingController = UIHostingController(rootView: makeContent(index: index, isActive: isActive))
+            let hostingController = PostHostingController(rootView: makeContent(index: index, isActive: isActive))
             hostingController.view.backgroundColor = .clear
+            let dismissPan = UIPanGestureRecognizer(target: self, action: #selector(handleDismissPan(_:)))
+            dismissPan.delegate = self
+            hostingController.dismissPan = dismissPan
+            hostingController.view.addGestureRecognizer(dismissPan)
             pages[index] = hostingController
             return hostingController
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let view = gestureRecognizer.view,
+                let entry = pages.first(where: { $0.value.view === view }),
+                let scrollView = entry.value.postScrollView,
+                  scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1,
+                  let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+            let post = parent.posts[entry.key]
+            let mediaHeight = min(
+                view.bounds.height * 0.75,
+                view.bounds.width * CGFloat(max(post.file.height, 1)) / CGFloat(max(post.file.width, 1))
+            )
+            let velocity = pan.velocity(in: view)
+            return pan.location(in: view).y <= mediaHeight && velocity.y > abs(velocity.x)
+        }
+
+        @objc private func handleDismissPan(_ pan: UIPanGestureRecognizer) {
+            guard let view = pan.view else { return }
+            let distance = max(0, pan.translation(in: view).y)
+            switch pan.state {
+            case .changed:
+                parent.onDismissDrag(distance, false)
+            case .ended:
+                parent.onDismissDrag(distance, true)
+            case .cancelled, .failed:
+                parent.onDismissDrag(0, true)
+            default:
+                break
+            }
         }
 
         func index(of controller: UIViewController) -> Int? {
