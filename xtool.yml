@@ -2,3 +2,4 @@ version: 1
 bundleID: dev.jemsoftware.tanukistash
 iconPath: Resources/AppIconProd.png
 infoPath: Resources/Info.xml
+skipLSP: true

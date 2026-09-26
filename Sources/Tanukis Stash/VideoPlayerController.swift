@@ -139,10 +139,6 @@ final class InlinePlayerView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
-        shutdown()
-    }
-
     override func layoutSubviews() {
         super.layoutSubviews()
         playerLayer.frame = bounds
