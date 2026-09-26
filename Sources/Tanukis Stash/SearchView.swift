@@ -58,6 +58,10 @@ struct SearchView: View {
             }
             .padding(10)
         }
+        .refreshable {
+            page = 1;
+            posts = await fetchRecentPosts(page, limit, search)
+        }
         .task({
             if (posts.count == 0) {
                 await getPosts(append: false);
@@ -123,10 +127,6 @@ struct SearchView: View {
                 PostView(posts: posts, currentIndex: selection.index, search: search)
             }
         })
-        .refreshable {
-            page = 1;
-            posts = await fetchRecentPosts(page, limit, search)
-        }
     }
     
     func getPosts(append: Bool) async {
@@ -252,6 +252,7 @@ struct PostPreviewFrame: View {
                     .background(Color.gray.opacity(0.50))
                 }
             }.cornerRadius(10)
+            .contentShape(Rectangle())
             .padding(0.1)
         }
         .buttonStyle(.plain)
