@@ -96,9 +96,9 @@ struct PostView: View {
                     search: search,
                     currentIndex: $currentIndex,
                     showImageViewer: $showImageViewer,
-                    onDismissDrag: { distance, ended in
+                    onDismissDrag: { distance, velocity, ended in
                         if ended {
-                            finishDismissDrag(distance: distance, height: geometry.size.height)
+                            finishDismissDrag(distance: distance, velocity: velocity, height: geometry.size.height)
                         } else {
                             dismissOffset = distance
                             dismissOpacity = 1 - min(1, distance / 600)
@@ -157,8 +157,8 @@ struct PostView: View {
         }
     }
 
-    func finishDismissDrag(distance: CGFloat, height: CGFloat) {
-        if distance > 140 {
+    func finishDismissDrag(distance: CGFloat, velocity: CGFloat, height: CGFloat) {
+        if PostDismissPolicy.shouldDismiss(distance: distance, velocity: velocity) {
             withAnimation(.easeOut(duration: 0.22)) {
                 dismissOffset = height
                 dismissOpacity = 0
@@ -205,6 +205,16 @@ struct PostView: View {
     }
 }
 
+enum PostDismissPolicy {
+    static func shouldBegin(offset: CGFloat, top: CGFloat, velocity: CGPoint) -> Bool {
+        offset <= top + 8 && velocity.y > abs(velocity.x)
+    }
+
+    static func shouldDismiss(distance: CGFloat, velocity: CGFloat) -> Bool {
+        velocity > -300 && (distance >= 80 || (distance >= 20 && velocity >= 650))
+    }
+}
+
 final class PostHostingController: UIHostingController<PostPageContent> {
     var dismissPan: UIPanGestureRecognizer?
     private(set) weak var postScrollView: UIScrollView?
@@ -231,7 +241,7 @@ struct PostPagerView: UIViewControllerRepresentable {
     var search: String
     @Binding var currentIndex: Int
     @Binding var showImageViewer: Bool
-    var onDismissDrag: (CGFloat, Bool) -> Void
+    var onDismissDrag: (CGFloat, CGFloat, Bool) -> Void
 
     func makeUIViewController(context: Context) -> UIPageViewController {
         let options = [UIPageViewController.OptionsKey.interPageSpacing: 0]
@@ -295,6 +305,7 @@ struct PostPagerView: UIViewControllerRepresentable {
             hostingController.view.backgroundColor = .clear
             let dismissPan = UIPanGestureRecognizer(target: self, action: #selector(handleDismissPan(_:)))
             dismissPan.delegate = self
+            dismissPan.maximumNumberOfTouches = 1
             hostingController.dismissPan = dismissPan
             hostingController.view.addGestureRecognizer(dismissPan)
             pages[index] = hostingController
@@ -305,27 +316,25 @@ struct PostPagerView: UIViewControllerRepresentable {
             guard let view = gestureRecognizer.view,
                 let entry = pages.first(where: { $0.value.view === view }),
                 let scrollView = entry.value.postScrollView,
-                  scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1,
                   let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
-            let post = parent.posts[entry.key]
-            let mediaHeight = min(
-                view.bounds.height * 0.75,
-                view.bounds.width * CGFloat(max(post.file.height, 1)) / CGFloat(max(post.file.width, 1))
+            return PostDismissPolicy.shouldBegin(
+                offset: scrollView.contentOffset.y,
+                top: -scrollView.adjustedContentInset.top,
+                velocity: pan.velocity(in: view.window)
             )
-            let velocity = pan.velocity(in: view)
-            return pan.location(in: view).y <= mediaHeight && velocity.y > abs(velocity.x)
         }
 
         @objc private func handleDismissPan(_ pan: UIPanGestureRecognizer) {
             guard let view = pan.view else { return }
-            let distance = max(0, pan.translation(in: view).y)
+            let distance = max(0, pan.translation(in: view.window).y)
+            let velocity = pan.velocity(in: view.window).y
             switch pan.state {
             case .changed:
-                parent.onDismissDrag(distance, false)
+                parent.onDismissDrag(distance, velocity, false)
             case .ended:
-                parent.onDismissDrag(distance, true)
+                parent.onDismissDrag(distance, velocity, true)
             case .cancelled, .failed:
-                parent.onDismissDrag(0, true)
+                parent.onDismissDrag(0, 0, true)
             default:
                 break
             }
@@ -452,7 +461,7 @@ struct InfoView: View {
 
     var body: some View {
         if (!post.description.isEmpty) {
-            AttributedText(descParser(text: .init(post.description)))
+            DTextView(text: post.description)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         VStack(alignment: .leading) {
