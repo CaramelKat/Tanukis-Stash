@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SafariServices
 
 struct SettingsView: View {
     
@@ -19,13 +20,21 @@ struct SettingsView: View {
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
     @State private var USER_ICON: String = UserDefaults.standard.string(forKey: "USER_ICON") ?? "";
+    @State private var browserPage: SettingsBrowserPage?
 
     let sources = ["e926.net", "e621.net"];
+
+    private var openSettingsLink: OpenURLAction {
+        OpenURLAction { url in
+            browserPage = SettingsBrowserPage(url: url)
+            return .handled
+        }
+    }
 
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Account"), footer: AUTHENTICATED ? nil : Link("Get your API key here", destination: URL(string: "https://e621.net/api_keys")!)) {
+                Section(header: Text("Account"), footer: AUTHENTICATED ? nil : Link("Get your API key here", destination: URL(string: "https://e621.net/api_keys")!).environment(\.openURL, openSettingsLink)) {
                     if (AUTHENTICATED) {
                         HStack {
                             AsyncImage(url: URL(string: USER_ICON)) { image in
@@ -71,6 +80,7 @@ struct SettingsView: View {
                                     }
                                 }
                             Link("Edit User Settings", destination: URL(string: "https://\(selection)/users/\(username)/edit?tab=blacklist")!)
+                                .environment(\.openURL, openSettingsLink)
                         }
                 }
 
@@ -122,6 +132,10 @@ struct SettingsView: View {
                 UserDefaults.standard.set(BLACKLIST, forKey: "USER_BLACKLIST");
             }
         }
+        .sheet(item: $browserPage) { page in
+            SettingsBrowserView(url: page.url)
+                .ignoresSafeArea()
+        }
     }
 
     func getUserIcon() async {
@@ -138,6 +152,21 @@ struct SettingsView: View {
         }
         UserDefaults.standard.set(USER_ICON, forKey: "USER_ICON");
     }
+}
+
+private struct SettingsBrowserPage: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
+
+private struct SettingsBrowserView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 struct SettingsView_Previews: PreviewProvider {
