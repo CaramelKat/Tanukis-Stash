@@ -26,7 +26,7 @@ struct UserData: Decodable, Hashable {
 	let receive_email_notifications: Bool;
 	let enable_keyboard_navigation: Bool;
 	let enable_privacy_mode: Bool;
-	let style_usernames: Bool;
+	let style_usernames: Bool?;
 	let enable_auto_complete: Bool;
 	let is_verified: Bool;
 	let enable_safe_mode: Bool;

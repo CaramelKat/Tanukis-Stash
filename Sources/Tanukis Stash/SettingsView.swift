@@ -125,18 +125,16 @@ struct SettingsView: View {
     }
 
     func getUserIcon() async {
-        guard let userData = await fetchUserData() else { return }
-        let avatarPostId: Int? = userData.avatar_id
-        guard let post = await getPost(postId: avatarPostId!) else { return }
-        if ["gif", "webm", "mp4"].contains(post.file.ext) {
-            // If the avatar is a video or gif, use the preview image instead
-            USER_ICON = post.preview.url!
-        } else if post.file.url == nil {
-            // If the file URL is nil, use the preview URL
-            USER_ICON = post.preview.url!
+        if let userData = await fetchUserData(),
+           let avatarPostId = userData.avatar_id,
+           let post = await getPost(postId: avatarPostId) {
+            if ["gif", "webm", "mp4"].contains(post.file.ext) {
+                USER_ICON = post.preview.url ?? ""
+            } else {
+                USER_ICON = post.file.url ?? post.preview.url ?? ""
+            }
         } else {
-            // Otherwise, use the file URL
-            USER_ICON = post.file.url!
+            USER_ICON = ""
         }
         UserDefaults.standard.set(USER_ICON, forKey: "USER_ICON");
     }
