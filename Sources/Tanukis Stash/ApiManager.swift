@@ -210,6 +210,27 @@ func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostC
     }
 }
 
+// Fetches the total number of posts matching a search query, if the server reports one.
+// Returns nil for an empty search or if the request fails, so the UI can hide the count.
+func fetchPostCount(search: String) async -> Int? {
+    let trimmed = search.trimmingCharacters(in: .whitespacesAndNewlines);
+    if (trimmed.isEmpty) { return nil; }
+
+    let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? "";
+    let url: String = "/counts/posts.json?tags=\(encoded)";
+
+    let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+    if (data) == nil { return nil; }
+
+    do {
+        let parsedData = try JSONDecoder().decode(PostCounts.self, from: data!);
+        return parsedData.counts.posts;
+    } catch {
+        os_log("Error fetching post count: %{public}s", log: .default, error.localizedDescription);
+        return nil;
+    }
+}
+
 func favoritePost(postId: Int) async -> Bool {
     let url = "/favorites.json?post_id=\(postId)"
     let data = await makeRequest(destination: url, method: "POST", body: nil, contentType: "application/json");

@@ -22,7 +22,7 @@ struct MediaView: View {
             .background(Color.black.opacity(0.5))
         }
         else if(["webm", "mp4"].contains(fileType)) {
-            VideoView(post: post)
+            VideoView(post: post, isActive: isActive)
         }
         else if(!["gif", "webm", "mp4"].contains(fileType)) {
             ImageView(post: post)

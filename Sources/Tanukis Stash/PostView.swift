@@ -41,7 +41,7 @@ struct PostPageContent: View {
                                 Spacer();
                             }
                             HStack {
-                                Text("\(post.rating) #\(String(post.id)) ⬆️\(post.score.total) ❤️\(post.fav_count)")
+                                Text("\(post.rating) #\(String(post.id)) ⬆️\(post.score.total) ❤️\(post.fav_count) 💬\(post.comment_count)")
                                 Spacer()
                             }
                         }
@@ -68,16 +68,18 @@ struct PostView: View {
     @State var posts: [PostContent];
     @State var currentIndex: Int;
     @State var search: String;
+    var onIndexChanged: ((Int) -> Void)? = nil;
     @Environment(\.dismiss) private var dismiss;
 
     @State private var displayToastType = 0;
     @State private var dismissOffset: CGFloat = 0;
     @State private var dismissOpacity: Double = 1;
 
-    init(posts: [PostContent], currentIndex: Int, search: String) {
+    init(posts: [PostContent], currentIndex: Int, search: String, onIndexChanged: ((Int) -> Void)? = nil) {
         _posts = State(initialValue: posts)
         _currentIndex = State(initialValue: currentIndex)
         _search = State(initialValue: search)
+        self.onIndexChanged = onIndexChanged
     }
 
     init(post: PostContent, search: String) {
@@ -142,8 +144,9 @@ struct PostView: View {
         .onAppear {
             preloadNeighbors()
         }
-        .onChange(of: currentIndex) { _ in
+        .onChange(of: currentIndex) { _, newIndex in
             preloadNeighbors()
+            onIndexChanged?(newIndex)
         }
     }
 
@@ -460,6 +463,11 @@ struct InfoView: View {
     @State var search: String;
 
     var body: some View {
+        Text(formatPostDate(post.created_at))
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 4)
         if (!post.description.isEmpty) {
             DTextView(text: post.description)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -503,6 +511,7 @@ struct ActionBar: View {
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     @Binding var displayToastType: Int
     @State private var showComments: Bool = false;
+    @State private var showLoginPrompt: Bool = false;
 
     var buttonSpacing = EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 5);
     
@@ -510,6 +519,10 @@ struct ActionBar: View {
         ZStack {
             HStack(spacing: 25) {
                 Button(action: {
+                    if (!AUTHENTICATED) {
+                        showLoginPrompt = true;
+                        return;
+                    }
                     Task.init {
                         our_score = await votePost(postId: post.id, value: 1, no_unvote: false);
                     }
@@ -518,8 +531,12 @@ struct ActionBar: View {
                         .font(.title)
                         .foregroundColor(!score_valid ? .gray : .green)
                         .padding(buttonSpacing)
-                }.disabled(!score_valid || !AUTHENTICATED)
+                }.disabled(AUTHENTICATED && !score_valid)
                 Button(action: {
+                    if (!AUTHENTICATED) {
+                        showLoginPrompt = true;
+                        return;
+                    }
                     Task.init {
                         favorited = favorited ? await unFavoritePost(postId: post.id) : await favoritePost(postId: post.id);
                     }
@@ -528,8 +545,12 @@ struct ActionBar: View {
                         .font(.title)
                         .foregroundColor(.red)
                         .padding(buttonSpacing)
-                }.disabled(!AUTHENTICATED)
+                }
                 Button(action: {
+                    if (!AUTHENTICATED) {
+                        showLoginPrompt = true;
+                        return;
+                    }
                     Task.init {
                         our_score = await votePost(postId: post.id, value: -1, no_unvote: false);
                     }
@@ -538,7 +559,7 @@ struct ActionBar: View {
                         .font(.title)
                         .foregroundColor(!score_valid ? .gray : .orange)
                         .padding(buttonSpacing)
-                }.disabled(!score_valid || !AUTHENTICATED)
+                }.disabled(AUTHENTICATED && !score_valid)
             }
             HStack() {
                 Spacer().frame(width: 10)
@@ -579,8 +600,14 @@ struct ActionBar: View {
         .sheet(isPresented: $showComments, content: {
             CommentsView(post: post)
         })
+        .alert("You need to log in first", isPresented: $showLoginPrompt) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Sign in from Settings with your e621 username and API key to favorite or vote on posts.")
+        }
         .onAppear() {
             favorited = post.is_favorited
+            AUTHENTICATED = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
         }
         .task {
             await fetchCurrentPostLiked();
@@ -664,6 +691,23 @@ struct Tag: View {
             SearchView(search: String(tag))
         }
     }
+}
+
+// Formats a post's ISO-8601 created_at string into a human readable local date.
+func formatPostDate(_ isoDate: String) -> String {
+    let withFraction = ISO8601DateFormatter()
+    withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let noFraction = ISO8601DateFormatter()
+    noFraction.formatOptions = [.withInternetDateTime]
+
+    guard let date = withFraction.date(from: isoDate) ?? noFraction.date(from: isoDate) else {
+        return isoDate
+    }
+
+    let formatter = DateFormatter()
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .short
+    return "Posted on \(formatter.string(from: date))"
 }
 
 func descParser(text: String)-> String {
