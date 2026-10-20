@@ -8,6 +8,14 @@ struct Post: Decodable {
     let post: PostContent;
 }
 
+struct PostCounts: Decodable {
+    let counts: PostCount;
+
+    struct PostCount: Decodable {
+        let posts: Int;
+    }
+}
+
 struct PostContent: Decodable, Hashable {
     static func == (lhs: PostContent, rhs: PostContent) -> Bool {
         return lhs.id == rhs.id
