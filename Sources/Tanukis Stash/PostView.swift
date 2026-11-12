@@ -967,29 +967,51 @@ struct Tag: View {
     @State var tag: String
     @State var search: String
     @State var textColor: Color;
-    @State var isActive: Bool = false
-    
+
+    /// The two ways a tag can be opened, chosen from the tap dialog.
+    private enum TagSearch: Hashable {
+        case newSearch
+        case addToCurrent
+    }
+
+    @State private var showOptions = false
+    @State private var destination: TagSearch? = nil
+
+    /// The current query plus this tag, without a leading space when the
+    /// current search is empty.
+    private var combinedSearch: String {
+        let base = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return base.isEmpty ? tag : base + " " + tag
+    }
+
     var body: some View {
-        Menu {
-            NavigationLink(destination: SearchView(search: String(tag))) {
-                Text("New Search")
-            }
-            NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                Text("Add to Current Search")
-            }
+        Button {
+            showOptions = true;
         } label: {
             Text(tag)
                 .font(.body)
                 .foregroundColor(textColor)
                 .multilineTextAlignment(.leading)
-        } primaryAction: {
-            isActive.toggle()
         }
-        //.background(
-        //    NavigationLink(destination: SearchView(search: String(tag)), isActive: $isActive) {}
-        //)
-        .navigationDestination(isPresented: $isActive) {
-            SearchView(search: String(tag))
+        .buttonStyle(.plain)
+        .confirmationDialog(Text(tag), isPresented: $showOptions, titleVisibility: .visible) {
+            Button("New Search") {
+                SearchHistory.record(tag);
+                destination = .newSearch;
+            }
+            Button("Add to Current Search") {
+                SearchHistory.record(combinedSearch);
+                destination = .addToCurrent;
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        .navigationDestination(item: $destination) { choice in
+            switch choice {
+            case .newSearch:
+                SearchView(search: tag)
+            case .addToCurrent:
+                SearchView(search: combinedSearch)
+            }
         }
     }
 }

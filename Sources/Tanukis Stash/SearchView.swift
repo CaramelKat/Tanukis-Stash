@@ -59,6 +59,8 @@ struct SearchView: View {
     @State private var upAccum: CGFloat = 0;
     @State private var downAccum: CGFloat = 0;
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
+    // Submitted queries, newest first, shown while the search field is empty.
+    @State private var recentSearches: [String] = SearchHistory.recent;
     @Environment(\.dismiss) private var dismiss;
     @Environment(\.dismissSearch) private var dismissSearch;
 
@@ -145,6 +147,7 @@ struct SearchView: View {
                 await refreshResultCount();
             }
             .task({
+                recentSearches = SearchHistory.recent;
                 if (posts.count == 0) {
                     await getPosts(append: false);
                 }
@@ -170,6 +173,23 @@ struct SearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("Posts")
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search for tags") {
+                // Remembered queries, shown before typing anything.
+                if (search.isEmpty && !recentSearches.isEmpty) {
+                    Section("Recent") {
+                        ForEach(recentSearches, id: \.self) { query in
+                            Button {
+                                runRecentSearch(query);
+                            } label: {
+                                Label(query, systemImage: "clock.arrow.circlepath");
+                            }
+                        }
+                        Button(role: .destructive) {
+                            clearRecentSearches();
+                        } label: {
+                            Label("Clear Recent Searches", systemImage: "trash");
+                        }
+                    }
+                }
                 //List {
                     ForEach(searchSuggestions, id: \.self) { tag in
                         Button(action: {
@@ -193,6 +213,7 @@ struct SearchView: View {
             .onSubmit(of: .search) {
                 posts = [];
                 resultCount = nil;
+                recordSearch();
                 Task.init {
                     await getPosts(append: false);
                     searchSuggestions.removeAll();
@@ -365,11 +386,32 @@ struct SearchView: View {
                 .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
                 .shadow(color: Color.black.opacity(0.2), radius: 5, y: 2)
 
-                // Live tag suggestions while typing, same as the main
-                // search bar.
-                if (floatingSearchFocused && !searchSuggestions.isEmpty) {
+                // Recent queries (when empty) and live tag suggestions while
+                // typing, same as the main search bar.
+                if (floatingSearchFocused && (!searchSuggestions.isEmpty || (search.isEmpty && !recentSearches.isEmpty))) {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
+                            if (search.isEmpty) {
+                                Text("Recent")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 14)
+                                    .padding(.top, 8)
+                                    .padding(.bottom, 2)
+                                ForEach(Array(recentSearches.prefix(10)), id: \.self) { query in
+                                    Button {
+                                        search = query;
+                                        submitFloatingSearch(proxy: proxy);
+                                    } label: {
+                                        Label(query, systemImage: "clock.arrow.circlepath")
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 9)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                             ForEach(Array(searchSuggestions.prefix(10)), id: \.self) { tag in
                                 Button {
                                     updateSearch(tag);
@@ -401,6 +443,7 @@ struct SearchView: View {
         searchSuggestions.removeAll();
         posts = [];
         resultCount = nil;
+        recordSearch();
         // Re-baseline the scroll tracking for the fresh, shorter content.
         restScrollOffset = nil;
         prevScrollOffset = nil;
@@ -410,6 +453,34 @@ struct SearchView: View {
             await getPosts(append: false);
         }
         proxy.scrollTo("gridTopAnchor", anchor: .top);
+    }
+
+    // MARK: - Search history
+
+    /// Saves a submitted query (only from the top-level search, so pushed tag
+    /// and favorites searches don't overwrite what the app reopens on).
+    func recordSearch() {
+        guard isTopView else { return }
+        SearchHistory.record(search);
+        recentSearches = SearchHistory.recent;
+    }
+
+    /// Runs one of the remembered queries tapped in the suggestions.
+    func runRecentSearch(_ query: String) {
+        search = query;
+        searchSuggestions.removeAll();
+        posts = [];
+        resultCount = nil;
+        recordSearch();
+        Task.init {
+            await getPosts(append: false);
+        }
+        dismissSearch();
+    }
+
+    func clearRecentSearches() {
+        SearchHistory.clearRecent();
+        recentSearches = [];
     }
 
     // Fetches the precise number of posts matching the current search for
