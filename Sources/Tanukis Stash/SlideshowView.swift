@@ -161,22 +161,3 @@ struct SlideshowOptionsView: View {
         }
     }
 }
-
-/// One-shot wrapper around a checked continuation, used by PostView to wait
-/// for the end of a video post (slideshow "wait for videos" mode). Safe to
-/// resume more than once.
-@MainActor
-final class SlideshowVideoWaiter {
-    private let continuation: CheckedContinuation<Void, Never>
-    private var resumed = false
-
-    init(_ continuation: CheckedContinuation<Void, Never>) {
-        self.continuation = continuation
-    }
-
-    func resume() {
-        guard !resumed else { return }
-        resumed = true
-        continuation.resume()
-    }
-}

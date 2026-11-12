@@ -100,7 +100,10 @@ struct PostView: View {
     @State private var showSlideshowOptions: Bool = false;
     @State private var slideshowTask: Task<Void, Never>? = nil;
     @State private var isLoadingMorePosts: Bool = false;
-    @State private var videoEndWaiters: [SlideshowVideoWaiter] = [];
+    /// Incremented every time the video on screen plays through to its end.
+    /// The slideshow waits on this counter instead of a one-shot continuation,
+    /// so a manual swipe during the wait can restart cleanly.
+    @State private var videoEndCount: Int = 0;
 
     init(posts: [PostContent], currentIndex: Int, search: String, onIndexChanged: ((Int) -> Void)? = nil) {
         _posts = State(initialValue: posts)
@@ -247,6 +250,10 @@ struct PostView: View {
 
     func startSlideshow() {
         isSlideshowRunning = true
+        // "Wait for videos" only works if the video actually plays, so force
+        // autoplay for every player while that mode is running. This ignores
+        // the normal Autoplay setting until the slideshow stops.
+        PlaybackRuntime.shared.forceVideoAutoplay = slideshowVideoMode == .playThrough
         // Keep the screen awake while the slideshow is running.
         UIApplication.shared.isIdleTimerDisabled = true
         slideshowTask = Task {
@@ -258,7 +265,7 @@ struct PostView: View {
         isSlideshowRunning = false
         slideshowTask?.cancel()
         slideshowTask = nil
-        resumeVideoEndWaiters()
+        PlaybackRuntime.shared.forceVideoAutoplay = false
         // The slideshow is off; the phone is allowed to fall asleep again.
         UIApplication.shared.isIdleTimerDisabled = false
     }
@@ -267,7 +274,11 @@ struct PostView: View {
         slideshowLoop: while isSlideshowRunning && !Task.isCancelled {
             guard currentIndex >= 0, currentIndex < posts.count else { break }
 
-            let currentPost = posts[currentIndex]
+            // Remember which post this pass started on. If the user swipes to
+            // another post while we are waiting, we start over on that post
+            // instead of advancing again (which caused a double jump).
+            let startIndex = currentIndex
+            let currentPost = posts[startIndex]
             let isVideo = isVideoPost(currentPost)
 
             if isVideo {
@@ -277,20 +288,25 @@ struct PostView: View {
                     continue slideshowLoop
                 case .playThrough:
                     // Wait for the video to actually finish, with a duration
-                    // based timeout as a fallback.
+                    // based timeout as a fallback. Returns false when the user
+                    // navigated away while it was playing.
                     let timeout = currentPost.duration.map { Double($0) + 2 } ?? 30
-                    await awaitVideoEnd(timeout: max(timeout, 5))
+                    let finished = await awaitVideoEnd(timeout: max(timeout, 5), startingAt: startIndex)
                     guard isSlideshowRunning && !Task.isCancelled else { break slideshowLoop }
+                    guard finished else { continue slideshowLoop }
                     await advanceSlideshow(skipVideos: false)
                     continue slideshowLoop
                 case .interval:
-                    await slideshowSleep(seconds: slideshowInterval)
+                    let elapsed = await slideshowWait(seconds: slideshowInterval, startingAt: startIndex)
+                    guard isSlideshowRunning && !Task.isCancelled else { break slideshowLoop }
+                    guard elapsed else { continue slideshowLoop }
                 }
             } else {
-                await slideshowSleep(seconds: slideshowInterval)
+                let elapsed = await slideshowWait(seconds: slideshowInterval, startingAt: startIndex)
+                guard isSlideshowRunning && !Task.isCancelled else { break slideshowLoop }
+                guard elapsed else { continue slideshowLoop }
             }
 
-            guard isSlideshowRunning && !Task.isCancelled else { break }
             await advanceSlideshow(skipVideos: slideshowVideoMode == .skip)
         }
     }
@@ -324,35 +340,41 @@ struct PostView: View {
         return ["webm", "mp4"].contains(String(post.file.ext))
     }
 
-    func slideshowSleep(seconds: Double) async {
-        try? await Task.sleep(for: .seconds(max(seconds, 0.1)))
+    /// Sleeps for the slideshow interval, but returns early when the user
+    /// swipes to a different post. Returns false in that case so the caller
+    /// restarts the interval for the post the user opened instead of
+    /// advancing it again straight away.
+    func slideshowWait(seconds: Double, startingAt index: Int) async -> Bool {
+        let deadline = Date().addingTimeInterval(max(seconds, 0.1))
+        while !Task.isCancelled && isSlideshowRunning {
+            guard currentIndex == index else { return false }
+            if Date() >= deadline { return true }
+            // Short polls keep manual navigation responsive without burning
+            // meaningful CPU.
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return false
     }
 
-    /// Wakes up when the video at the current index finishes playing, or after
-    /// `timeout` seconds, whichever comes first.
-    func awaitVideoEnd(timeout: Double) async {
-        await withCheckedContinuation { continuation in
-            let waiter = SlideshowVideoWaiter(continuation)
-            videoEndWaiters.append(waiter)
-            Task {
-                try? await Task.sleep(for: .seconds(max(timeout, 1)))
-                waiter.resume()
-            }
+    /// Wakes up when the video at `index` finishes playing, or after `timeout`
+    /// seconds, whichever comes first. Returns false if the user navigated to
+    /// a different post while waiting.
+    func awaitVideoEnd(timeout: Double, startingAt index: Int) async -> Bool {
+        let startCount = videoEndCount
+        let deadline = Date().addingTimeInterval(max(timeout, 1))
+        while !Task.isCancelled && isSlideshowRunning {
+            guard currentIndex == index else { return false }
+            if videoEndCount != startCount { return true }
+            if Date() >= deadline { return true }
+            try? await Task.sleep(for: .milliseconds(100))
         }
+        return false
     }
 
     /// Called by the video player when a post's video finishes playing.
     func handleVideoEnded(_ index: Int) {
         guard isSlideshowRunning, index == currentIndex else { return }
-        resumeVideoEndWaiters()
-    }
-
-    func resumeVideoEndWaiters() {
-        let waiters = videoEndWaiters
-        videoEndWaiters.removeAll()
-        for waiter in waiters {
-            waiter.resume()
-        }
+        videoEndCount += 1
     }
 
     // MARK: - Infinite loading (used by the slideshow and the post pager)

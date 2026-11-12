@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 
+@MainActor
 struct VideoPlayerController: View {
     var videoURL: URL
     var isActive: Bool = true
@@ -12,6 +13,8 @@ struct VideoPlayerController: View {
     /// Called when the video plays through to its end (slideshow support).
     var onVideoEnded: (() -> Void)? = nil
     @StateObject private var holder = PlayerHolder()
+    /// Slideshow "Wait for videos" forces playback regardless of settings.
+    @ObservedObject private var runtime = PlaybackRuntime.shared
 
     var body: some View {
         InlinePlayerViewRepresentable(
@@ -20,6 +23,7 @@ struct VideoPlayerController: View {
             isActive: isActive,
             isFullscreen: isFullScreen,
             autoPlayWhenActive: isFullScreen && UserDefaults.standard.bool(forKey: "VIDEO_AUTOPLAY"),
+            forceAutoplay: runtime.forceVideoAutoplay,
             onFullscreen: { onRequestFullscreen?() },
             onVideoEnded: onVideoEnded
         )
@@ -28,6 +32,16 @@ struct VideoPlayerController: View {
 
 final class PlayerHolder: ObservableObject {
     let player = AVPlayer()
+}
+
+/// Runtime-only playback overrides that are not user settings.
+@MainActor
+final class PlaybackRuntime: ObservableObject {
+    static let shared = PlaybackRuntime()
+
+    /// Set while the slideshow runs in "Wait for videos" mode, so every video
+    /// starts playing even when autoplay is turned off for normal browsing.
+    @Published var forceVideoAutoplay = false
 }
 
 /// Remembers where a video was last playing so another copy of the player
@@ -54,6 +68,9 @@ struct InlinePlayerViewRepresentable: UIViewRepresentable {
     var isActive: Bool
     var isFullscreen: Bool = false
     var autoPlayWhenActive: Bool = false
+    /// Starts playback even when the user paused or autoplay is off. Used by
+    /// the slideshow's "Wait for videos" mode.
+    var forceAutoplay: Bool = false
     var onFullscreen: () -> Void
     var onVideoEnded: (() -> Void)? = nil
 
@@ -63,6 +80,7 @@ struct InlinePlayerViewRepresentable: UIViewRepresentable {
         view.onFullscreen = onFullscreen
         view.onVideoEnded = onVideoEnded
         view.autoPlayWhenActive = autoPlayWhenActive
+        view.forceAutoplay = forceAutoplay
         view.setFullscreen(isFullscreen)
         return view
     }
@@ -74,6 +92,7 @@ struct InlinePlayerViewRepresentable: UIViewRepresentable {
         uiView.onFullscreen = onFullscreen
         uiView.onVideoEnded = onVideoEnded
         uiView.autoPlayWhenActive = autoPlayWhenActive
+        uiView.forceAutoplay = forceAutoplay
         uiView.setFullscreen(isFullscreen)
         uiView.setActive(isActive)
     }
@@ -115,6 +134,9 @@ final class InlinePlayerView: UIView {
     /// When true (fullscreen media viewer), playback starts automatically as
     /// soon as the page becomes active.
     var autoPlayWhenActive = false
+    /// When true, playback starts regardless of autoplay settings and any
+    /// earlier manual pause (slideshow "Wait for videos" mode).
+    var forceAutoplay = false
     private var isFullscreenState = false
     /// Set when the user explicitly pauses, so SwiftUI re-renders (which call
     /// setActive) do not override the pause with autoplay.
@@ -170,7 +192,7 @@ final class InlinePlayerView: UIView {
                 player.pause()
                 updatePlayState()
             }
-        } else if (autoPlayWhenActive && !userPaused && loadedURL != nil && player.timeControlStatus != .playing) {
+        } else if ((autoPlayWhenActive && !userPaused) || forceAutoplay) && loadedURL != nil && player.timeControlStatus != .playing {
             // Restart from the beginning if this item already finished.
             if let duration = player.currentItem?.duration, duration.seconds.isFinite,
                player.currentTime() >= duration {
