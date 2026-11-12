@@ -210,21 +210,21 @@ func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostC
     }
 }
 
-// Fetches the total number of posts matching a search query, if the server reports one.
-// Returns nil for an empty search or if the request fails, so the UI can hide the count.
-func fetchPostCount(search: String) async -> Int? {
+// Fetches the precise number of posts matching a search query from the
+// server's count endpoint (GET /posts/count.json). Returns nil for an empty
+// search or if the request fails, so the UI can hide the count.
+func fetchPostCount(search: String) async -> PostSearchCount? {
     let trimmed = search.trimmingCharacters(in: .whitespacesAndNewlines);
     if (trimmed.isEmpty) { return nil; }
 
     let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? "";
-    let url: String = "/counts/posts.json?tags=\(encoded)";
+    let url: String = "/posts/count.json?tags=\(encoded)";
 
-    let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+    let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json", noCache: true);
     if (data) == nil { return nil; }
 
     do {
-        let parsedData = try JSONDecoder().decode(PostCounts.self, from: data!);
-        return parsedData.counts.posts;
+        return try JSONDecoder().decode(PostSearchCount.self, from: data!);
     } catch {
         os_log("Error fetching post count: %{public}s", log: .default, error.localizedDescription);
         return nil;
@@ -233,16 +233,73 @@ func fetchPostCount(search: String) async -> Int? {
 
 func favoritePost(postId: Int) async -> Bool {
     let url = "/favorites.json?post_id=\(postId)"
-    let data = await makeRequest(destination: url, method: "POST", body: nil, contentType: "application/json");
-    if (data) == nil { return false; }
-    return true;
+    let result = await makeStatusRequest(destination: url, method: "POST", body: nil, contentType: "application/json");
+    guard let status = result.status else { return false; }
+    // 409 = already favorited: the desired state already holds.
+    return (200..<300).contains(status) || status == 409;
 }
 
 func unFavoritePost(postId: Int) async -> Bool {
     let url = "/favorites/\(postId).json"
-    let data = await makeRequest(destination: url, method: "DELETE", body: nil, contentType: "application/json");
-    if (data) == nil { return true; }
-    return false;
+    let result = await makeStatusRequest(destination: url, method: "DELETE", body: nil, contentType: "application/json");
+    guard let status = result.status else { return false; }
+    // 404/409 = no favorite to remove: the desired state already holds.
+    return (200..<300).contains(status) || status == 404 || status == 409;
+}
+
+/// Like makeRequest, but also reports the HTTP status code. makeRequest
+/// returns response bodies even for error statuses, which makes a successful
+/// action indistinguishable from a rejected one.
+func makeStatusRequest(destination: String, method: String, body: Data?, contentType: String, noCache: Bool = false) async -> (data: Data?, status: Int?) {
+    let domain = UserDefaults.standard.string(forKey: "api_source") ?? "e926.net";
+    let API_KEY = UserDefaults.standard.string(forKey: "API_KEY") ?? "";
+    let username = UserDefaults.standard.string(forKey: "username") ?? "";
+    let AUTH_STRING: String = "\(username):\(API_KEY)".data(using: .utf8)?.base64EncodedString() ?? "";
+    guard let url = URL(string: "https://\(domain)\(destination)") else { return (nil, nil); }
+
+    var request = URLRequest(url: url)
+    if (noCache) {
+        // State fetches (favorites, votes) must not be served from the URL
+        // cache, or they would report the state from before the last action.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+    }
+    request.httpMethod = method
+    request.addValue(contentType, forHTTPHeaderField: "Content-Type")
+    request.addValue(userAgent, forHTTPHeaderField: "User-Agent")
+
+    if ![API_KEY, username].contains("") {
+        request.addValue("Basic \(AUTH_STRING)", forHTTPHeaderField: "Authorization")
+    }
+
+    do {
+        if (body != nil && method != "GET") {
+            request.httpBody = body!;
+        }
+        let (data, response) = try await URLSession.shared.data(for: request);
+
+        os_log("HTTP %{public}s %{public}d https://%{public}s%{public}s", log: .default, method, response.getStatusCode() ?? -1, domain, destination)
+        return (data, response.getStatusCode());
+    } catch {
+        DispatchQueue.main.async {
+            os_log("Failed to make request: %{public}s", log: .default, error.localizedDescription);
+        }
+        return (nil, nil);
+    }
+}
+
+/// Whether the logged-in user has favorited the given post.
+@MainActor
+func fetchPostIsFavorited(postId: Int) async -> Bool {
+    do {
+        let url = "/posts/\(postId).json"
+        let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json", noCache: true);
+        if (data) == nil { return false; }
+        let parsedData = try JSONDecoder().decode(Post.self, from: data!)
+        return parsedData.post.is_favorited;
+    } catch {
+        print(error);
+        return false;
+    }
 }
 
 func fetchComments(postId: Int) async -> [CommentContent] {
@@ -258,38 +315,51 @@ func fetchComments(postId: Int) async -> [CommentContent] {
     }
 }
 
+// In-memory cache of the logged-in user's vote per post. Populated by
+// successful state fetches and by vote responses, so the vote buttons can
+// render instantly instead of waiting on a slow fetch.
+@MainActor private var ourVoteCache: [Int: Int] = [:]
+
+@MainActor
 func getVote(postId: Int) async -> Int {
+    if let cached = ourVoteCache[postId] { return cached }
     let url = "/posts/\(postId)"
-    let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "text/html");
-    if (data == nil) { return 0; }
-    do {
-        let textContent = String(data: data!, encoding: .utf8) ?? ""
-        if textContent.contains("data-vote=\"1\"") {
-            return 1
-        }
-        else if textContent.contains("data-vote=\"-1\"") {
-            return -1
-        }
-        return 0
+    let result = await makeStatusRequest(destination: url, method: "GET", body: nil, contentType: "text/html", noCache: true);
+    // Only cache values from a successful fetch; a failed one (the HTML
+    // route is TOS-gated for some clients) would otherwise stick as "no
+    // vote" for the rest of the session.
+    guard let status = result.status, (200..<300).contains(status), let data = result.data else {
+        return ourVoteCache[postId] ?? 0
     }
+    let textContent = String(data: data, encoding: .utf8) ?? ""
+    var vote = 0
+    if textContent.contains("data-vote=\"1\"") {
+        vote = 1
+    }
+    else if textContent.contains("data-vote=\"-1\"") {
+        vote = -1
+    }
+    ourVoteCache[postId] = vote
+    return vote
 }
 
+@MainActor
 func votePost(postId: Int, value: Int, no_unvote: Bool) async -> Int {
     let url = "/posts/\(postId)/votes.json"
     let data = await makeRequest(destination: url, method: "POST", body: "score=\(value)&no_unvote=\(no_unvote)".data(using: .utf8), contentType: "application/x-www-form-urlencoded");
-    if (data == nil) { return 0; }
+    if (data == nil) { return ourVoteCache[postId] ?? 0; }
     do {
         let json = try JSONDecoder().decode(VoteResponse.self, from: data!);
-        //os_log("%{public}@", log: .default, json);
-        return json.our_score ?? 0
+        let score = json.our_score ?? 0
+        ourVoteCache[postId] = score
+        return score
     }
     catch {
-        //os_log("Error decoding vote response: %{public}s", log: .default, error);
-        return 0
+        return ourVoteCache[postId] ?? 0
     }
 }
 
-func makeRequest(destination: String, method: String, body: Data?, contentType: String) async -> Data? {
+func makeRequest(destination: String, method: String, body: Data?, contentType: String, noCache: Bool = false) async -> Data? {
     let domain = UserDefaults.standard.string(forKey: "api_source") ?? "e926.net";
     let API_KEY = UserDefaults.standard.string(forKey: "API_KEY") ?? "";
     let username = UserDefaults.standard.string(forKey: "username") ?? "";
@@ -297,6 +367,11 @@ func makeRequest(destination: String, method: String, body: Data?, contentType: 
     let url = URL(string: "https://\(domain)\(destination)")
 
     var request = URLRequest(url: url!)
+    if (noCache) {
+        // State fetches (favorites, votes) must not be served from the URL
+        // cache, or they would report the state from before the last action.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+    }
     request.httpMethod = method
     request.addValue(contentType, forHTTPHeaderField: "Content-Type")
     request.addValue(userAgent, forHTTPHeaderField: "User-Agent")

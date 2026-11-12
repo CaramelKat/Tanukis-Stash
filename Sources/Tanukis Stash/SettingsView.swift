@@ -21,6 +21,10 @@ struct SettingsView: View {
     @State private var BLACKLIST: String = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
     @State private var USER_ICON: String = UserDefaults.standard.string(forKey: "USER_ICON") ?? "";
     @State private var browserPage: SettingsBrowserPage?
+    @AppStorage("APP_THEME") private var appTheme: AppTheme = .dark;
+    @AppStorage("VIDEO_AUTOPLAY") private var videoAutoplay: Bool = true;
+    @AppStorage("VIDEO_LOOP") private var videoLoop: Bool = true;
+    @AppStorage("VIDEO_MUTED_DEFAULT") private var videoStartMuted: Bool = false;
 
     let sources = ["e926.net", "e621.net"];
 
@@ -84,6 +88,44 @@ struct SettingsView: View {
                         }
                 }
 
+                Section(header: Text("Appearance")) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Button {
+                            appTheme = theme
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(theme.swatch)
+                                    Image(systemName: theme.symbol)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(theme.swatchSymbolColor)
+                                }
+                                .frame(width: 34, height: 34)
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.08)))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(theme.title)
+                                        .foregroundColor(.primary)
+                                    Text(theme.subtitle)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                if (appTheme == theme) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 Section(header: Text("App Settings")) {
                     Picker("API Source", selection: $selection) {
                         ForEach(sources, id: \.self) {
@@ -106,6 +148,15 @@ struct SettingsView: View {
                                 UserDefaults.standard.set(ENABLE_BLACKLIST, forKey: "ENABLE_BLACKLIST");
                             }
                     }
+                }
+
+                Section(header: Text("Video Playback"), footer: Text("Autoplay starts videos as soon as they are opened in the fullscreen viewer. Loop replays them from the beginning when they end. Start muted makes new videos start silent until you unmute them.")) {
+                    Toggle("Autoplay videos", isOn: $videoAutoplay)
+                        .toggleStyle(.switch)
+                    Toggle("Loop videos", isOn: $videoLoop)
+                        .toggleStyle(.switch)
+                    Toggle("Start muted", isOn: $videoStartMuted)
+                        .toggleStyle(.switch)
                 }
 
                 Section(header: Text("App Information")) {
