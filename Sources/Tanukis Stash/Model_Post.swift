@@ -8,12 +8,12 @@ struct Post: Decodable {
     let post: PostContent;
 }
 
-struct PostCounts: Decodable {
-    let counts: PostCount;
-
-    struct PostCount: Decodable {
-        let posts: Int;
-    }
+// Response of GET /posts/count.json — the precise number of posts matching a
+// tag query. `capped` means the query has more posts than the server is
+// willing to count, so `count` is a lower bound.
+struct PostSearchCount: Decodable {
+    let count: Int;
+    let capped: Bool;
 }
 
 struct PostContent: Decodable, Hashable {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import AlertToast
 import AttributedText
 
@@ -13,8 +14,13 @@ struct PostPageContent: View {
     @State var post: PostContent;
     @State var search: String;
     @Binding var showImageViewer: Bool;
+    @Binding var displayToastType: Int;
     var isActive: Bool = true;
+    var onVideoEnded: (() -> Void)? = nil;
 
+    // Tapping an image or GIF opens the fullscreen viewer. Videos open it via
+    // the player's fullscreen button instead; tapping a video surface toggles
+    // the player controls.
     private var tapGesture: some Gesture {
         !["webm", "mp4"].contains(String(post.file.ext))
             ? (TapGesture().onEnded { showImageViewer = true })
@@ -29,11 +35,23 @@ struct PostPageContent: View {
             )
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
-                    MediaView(post: post, geometry: geometry, isActive: isActive)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: mediaHeight)
-                        .contentShape(Rectangle())
-                        .gesture(tapGesture)
+                    MediaView(
+                        post: post,
+                        geometry: geometry,
+                        isActive: isActive,
+                        onRequestFullscreen: { showImageViewer = true },
+                        onVideoEnded: onVideoEnded
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: mediaHeight)
+                    .contentShape(Rectangle())
+                    .gesture(tapGesture)
+                    // Hold on a picture/GIF for the copy/download menu.
+                    .contextMenu {
+                        if (!["webm", "mp4"].contains(String(post.file.ext))) {
+                            MediaActionButtons(post: post, displayToastType: $displayToastType)
+                        }
+                    }
                     VStack(spacing: 0) {
                         VStack {
                             HStack {
@@ -75,6 +93,18 @@ struct PostView: View {
     @State private var dismissOffset: CGFloat = 0;
     @State private var dismissOpacity: Double = 1;
 
+    // Slideshow (reconstructed from the 0.4.6 binary and extended)
+    @AppStorage("SLIDESHOW_INTERVAL") private var slideshowInterval: Double = 5;
+    @AppStorage("SLIDESHOW_VIDEO_MODE") private var slideshowVideoMode: SlideshowVideoMode = .interval;
+    @State private var isSlideshowRunning: Bool = false;
+    @State private var showSlideshowOptions: Bool = false;
+    @State private var slideshowTask: Task<Void, Never>? = nil;
+    @State private var isLoadingMorePosts: Bool = false;
+    /// Incremented every time the video on screen plays through to its end.
+    /// The slideshow waits on this counter instead of a one-shot continuation,
+    /// so a manual swipe during the wait can restart cleanly.
+    @State private var videoEndCount: Int = 0;
+
     init(posts: [PostContent], currentIndex: Int, search: String, onIndexChanged: ((Int) -> Void)? = nil) {
         _posts = State(initialValue: posts)
         _currentIndex = State(initialValue: currentIndex)
@@ -98,6 +128,7 @@ struct PostView: View {
                     search: search,
                     currentIndex: $currentIndex,
                     showImageViewer: $showImageViewer,
+                    displayToastType: $displayToastType,
                     onDismissDrag: { distance, velocity, ended in
                         if ended {
                             finishDismissDrag(distance: distance, velocity: velocity, height: geometry.size.height)
@@ -105,10 +136,18 @@ struct PostView: View {
                             dismissOffset = distance
                             dismissOpacity = 1 - min(1, distance / 600)
                         }
-                    }
+                    },
+                    onVideoEnded: { index in handleVideoEnded(index) }
                 )
 
-                ActionBar(post: post, search: search, displayToastType: $displayToastType)
+                ActionBar(
+                    post: post,
+                    search: search,
+                    displayToastType: $displayToastType,
+                    isSlideshowRunning: $isSlideshowRunning,
+                    onToggleSlideshow: { toggleSlideshow() },
+                    onFavoriteChanged: { postID, newValue in updateFavoriteState(postID: postID, isFavorited: newValue) }
+                )
                     .id(post.id)
             }
             .offset(y: dismissOffset)
@@ -116,9 +155,29 @@ struct PostView: View {
             .toast(isPresenting: Binding<Bool>(get: { displayToastType != 0 }, set: { _ in })) {
                 getToast()
             }
-            .sheet(isPresented: $showImageViewer, content: {
-                            FullscreenImageViewer(post: post)
-                        })
+            // Fullscreen media viewer. currentIndex is shared with the post
+            // pager, so swiping inside the viewer navigates posts and the
+            // slideshow keeps advancing the fullscreen media.
+            .fullScreenCover(isPresented: $showImageViewer, content: {
+                FullscreenMediaViewer(
+                    posts: $posts,
+                    currentIndex: $currentIndex,
+                    isSlideshowRunning: $isSlideshowRunning,
+                    onToggleSlideshow: { toggleSlideshow() },
+                    onStartSlideshow: { startSlideshow() },
+                    onVideoEnded: { index in handleVideoEnded(index) },
+                    onFavoriteChanged: { postID, newValue in updateFavoriteState(postID: postID, isFavorited: newValue) }
+                )
+            })
+            .sheet(isPresented: $showSlideshowOptions, content: {
+                // The slideshow only starts once the user presses Start in
+                // the sheet, after picking the interval and video options.
+                SlideshowOptionsView(onStart: {
+                    if (!isSlideshowRunning) {
+                        startSlideshow();
+                    }
+                })
+            })
             /*.alert(isPresented: Binding<Bool>(get: { displayToastType == 3 }, set: { _ in })) {
                 Alert(
                     title: Text("Permission Denied"),
@@ -147,6 +206,15 @@ struct PostView: View {
         .onChange(of: currentIndex) { _, newIndex in
             preloadNeighbors()
             onIndexChanged?(newIndex)
+            ensureMorePosts()
+        }
+        .onDisappear {
+            // Stops the slideshow (if running) and lets the screen sleep again.
+            // Skip while the fullscreen viewer is presented: on some iOS
+            // versions onDisappear also fires when a fullScreenCover appears.
+            if (!showImageViewer) {
+                stopSlideshow()
+            }
         }
     }
 
@@ -157,6 +225,189 @@ struct PostView: View {
                     ImageView.preload(urlString)
                 }
             }
+        }
+    }
+
+    /// Writes a post's favorite state back into the posts array so every view
+    /// (post page, fullscreen viewer, revisited pages) agrees on it.
+    func updateFavoriteState(postID: Int, isFavorited: Bool) {
+        if let index = posts.firstIndex(where: { $0.id == postID }) {
+            posts[index].is_favorited = isFavorited
+        }
+    }
+
+    // MARK: - Slideshow
+
+    func toggleSlideshow() {
+        if isSlideshowRunning {
+            stopSlideshow()
+        } else {
+            // Don't start right away: the user picks the interval and video
+            // options first, then presses Start in the sheet.
+            showSlideshowOptions = true
+        }
+    }
+
+    func startSlideshow() {
+        isSlideshowRunning = true
+        // "Wait for videos" only works if the video actually plays, so force
+        // autoplay for every player while that mode is running. This ignores
+        // the normal Autoplay setting until the slideshow stops.
+        PlaybackRuntime.shared.forceVideoAutoplay = slideshowVideoMode == .playThrough
+        // Keep the screen awake while the slideshow is running.
+        UIApplication.shared.isIdleTimerDisabled = true
+        slideshowTask = Task {
+            await runSlideshowStep()
+        }
+    }
+
+    func stopSlideshow() {
+        isSlideshowRunning = false
+        slideshowTask?.cancel()
+        slideshowTask = nil
+        PlaybackRuntime.shared.forceVideoAutoplay = false
+        // The slideshow is off; the phone is allowed to fall asleep again.
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    func runSlideshowStep() async {
+        slideshowLoop: while isSlideshowRunning && !Task.isCancelled {
+            guard currentIndex >= 0, currentIndex < posts.count else { break }
+
+            // Remember which post this pass started on. If the user swipes to
+            // another post while we are waiting, we start over on that post
+            // instead of advancing again (which caused a double jump).
+            let startIndex = currentIndex
+            let currentPost = posts[startIndex]
+            let isVideo = isVideoPost(currentPost)
+
+            if isVideo {
+                switch slideshowVideoMode {
+                case .skip:
+                    await advanceSlideshow(skipVideos: true)
+                    continue slideshowLoop
+                case .playThrough:
+                    // Wait for the video to actually finish, with a duration
+                    // based timeout as a fallback. Returns false when the user
+                    // navigated away while it was playing.
+                    let timeout = currentPost.duration.map { Double($0) + 2 } ?? 30
+                    let finished = await awaitVideoEnd(timeout: max(timeout, 5), startingAt: startIndex)
+                    guard isSlideshowRunning && !Task.isCancelled else { break slideshowLoop }
+                    guard finished else { continue slideshowLoop }
+                    await advanceSlideshow(skipVideos: false)
+                    continue slideshowLoop
+                case .interval:
+                    let elapsed = await slideshowWait(seconds: slideshowInterval, startingAt: startIndex)
+                    guard isSlideshowRunning && !Task.isCancelled else { break slideshowLoop }
+                    guard elapsed else { continue slideshowLoop }
+                }
+            } else {
+                let elapsed = await slideshowWait(seconds: slideshowInterval, startingAt: startIndex)
+                guard isSlideshowRunning && !Task.isCancelled else { break slideshowLoop }
+                guard elapsed else { continue slideshowLoop }
+            }
+
+            await advanceSlideshow(skipVideos: slideshowVideoMode == .skip)
+        }
+    }
+
+    func advanceSlideshow(skipVideos: Bool) async {
+        var next = currentIndex + 1
+
+        if skipVideos {
+            while next < posts.count && isVideoPost(posts[next]) {
+                next += 1
+            }
+        }
+
+        if next >= posts.count {
+            await loadMorePosts()
+            if skipVideos {
+                while next < posts.count && isVideoPost(posts[next]) {
+                    next += 1
+                }
+            }
+            guard next < posts.count else {
+                stopSlideshow()
+                return
+            }
+        }
+
+        currentIndex = next
+    }
+
+    func isVideoPost(_ post: PostContent) -> Bool {
+        return ["webm", "mp4"].contains(String(post.file.ext))
+    }
+
+    /// Sleeps for the slideshow interval, but returns early when the user
+    /// swipes to a different post. Returns false in that case so the caller
+    /// restarts the interval for the post the user opened instead of
+    /// advancing it again straight away.
+    func slideshowWait(seconds: Double, startingAt index: Int) async -> Bool {
+        let deadline = Date().addingTimeInterval(max(seconds, 0.1))
+        while !Task.isCancelled && isSlideshowRunning {
+            guard currentIndex == index else { return false }
+            if Date() >= deadline { return true }
+            // Short polls keep manual navigation responsive without burning
+            // meaningful CPU.
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return false
+    }
+
+    /// Wakes up when the video at `index` finishes playing, or after `timeout`
+    /// seconds, whichever comes first. Returns false if the user navigated to
+    /// a different post while waiting.
+    func awaitVideoEnd(timeout: Double, startingAt index: Int) async -> Bool {
+        let startCount = videoEndCount
+        let deadline = Date().addingTimeInterval(max(timeout, 1))
+        while !Task.isCancelled && isSlideshowRunning {
+            guard currentIndex == index else { return false }
+            if videoEndCount != startCount { return true }
+            if Date() >= deadline { return true }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return false
+    }
+
+    /// Called by the video player when a post's video finishes playing.
+    func handleVideoEnded(_ index: Int) {
+        guard isSlideshowRunning, index == currentIndex else { return }
+        videoEndCount += 1
+    }
+
+    // MARK: - Infinite loading (used by the slideshow and the post pager)
+
+    /// Fetches more posts once the pager gets close to the end of the
+    /// currently loaded set.
+    func ensureMorePosts() {
+        guard !isLoadingMorePosts, currentIndex >= posts.count - 3 else { return }
+        Task {
+            await loadMorePosts()
+        }
+    }
+
+    func loadMorePosts() async {
+        guard !isLoadingMorePosts else { return }
+        isLoadingMorePosts = true
+        defer { isLoadingMorePosts = false }
+
+        let limit = 75
+        // posts.count / limit + 1 is the next page this pager has not seen.
+        // Blacklist filtering can make pages smaller, so retry one page
+        // further if a fetch comes back with only already-known posts.
+        var page = (posts.count / limit) + 1
+        for _ in 0..<3 {
+            let fetched = await fetchRecentPosts(page, limit, search)
+            let knownIDs = Set(posts.map { $0.id })
+            let fresh = fetched.filter { !knownIDs.contains($0.id) }
+            if !fresh.isEmpty {
+                posts += fresh
+                return
+            }
+            if fetched.isEmpty { return }
+            page += 1
         }
     }
 
@@ -201,6 +452,12 @@ struct PostView: View {
         case 3:
             clearToast()
             return AlertToast(type: .error(Color.red), title: "Photo library access denied")
+        case 4:
+            clearToast()
+            return AlertToast(type: .error(Color.red), title: "Failed to save")
+        case 5:
+            clearToast()
+            return AlertToast(type: .complete(Color.green), title: "Copied!")
         default:
             clearToast()
             return AlertToast(type: .regular, title: "Unknown error \(displayToastType)")
@@ -244,7 +501,9 @@ struct PostPagerView: UIViewControllerRepresentable {
     var search: String
     @Binding var currentIndex: Int
     @Binding var showImageViewer: Bool
+    @Binding var displayToastType: Int
     var onDismissDrag: (CGFloat, CGFloat, Bool) -> Void
+    var onVideoEnded: ((Int) -> Void)? = nil
 
     func makeUIViewController(context: Context) -> UIPageViewController {
         let options = [UIPageViewController.OptionsKey.interPageSpacing: 0]
@@ -290,11 +549,14 @@ struct PostPagerView: UIViewControllerRepresentable {
         }
 
         func makeContent(index: Int, isActive: Bool) -> PostPageContent {
-            PostPageContent(
+            let onVideoEnded = parent.onVideoEnded
+            return PostPageContent(
                 post: parent.posts[index],
                 search: parent.search,
                 showImageViewer: parent.$showImageViewer,
-                isActive: isActive
+                displayToastType: parent.$displayToastType,
+                isActive: isActive,
+                onVideoEnded: onVideoEnded == nil ? nil : { onVideoEnded?(index) }
             )
         }
 
@@ -503,65 +765,53 @@ struct InfoView: View {
 }
 
 struct ActionBar: View {
-    @State var post: PostContent;
+    var post: PostContent;
     @State var search: String;
     @State var favorited: Bool = false;
-    @State var our_score: Int = 2;
-    @State var score_valid: Bool = false
+    // Start in a valid neutral state so the buttons render colored right
+    // away (like the favorite heart); a known/cached vote corrects them
+    // shortly after. 2/invalid meant "gray until the fetch lands".
+    @State var our_score: Int = 0;
+    @State var score_valid: Bool = true
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     @Binding var displayToastType: Int
+    @Binding var isSlideshowRunning: Bool
+    var onToggleSlideshow: () -> Void
+    /// Reports (post id, new favorite state) so the owning view can keep the
+    /// post data in sync — the post page and the fullscreen viewer then agree,
+    /// and revisiting a page later shows the right state.
+    var onFavoriteChanged: ((Int, Bool) -> Void)? = nil
     @State private var showComments: Bool = false;
     @State private var showLoginPrompt: Bool = false;
+    /// Bumped whenever the user votes/favorites, so a state fetch that was
+    /// still in flight does not clobber the newer user action.
+    @State private var stateGeneration: Int = 0;
 
     var buttonSpacing = EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 5);
     
     var body: some View {
         ZStack {
             HStack(spacing: 25) {
-                Button(action: {
-                    if (!AUTHENTICATED) {
-                        showLoginPrompt = true;
-                        return;
-                    }
-                    Task.init {
-                        our_score = await votePost(postId: post.id, value: 1, no_unvote: false);
-                    }
-                }) {
+                Button(action: { vote(1) }) {
                     Image(systemName: our_score == 1 ? "arrowtriangle.up.fill" : "arrowtriangle.up")
                         .font(.title)
                         .foregroundColor(!score_valid ? .gray : .green)
                         .padding(buttonSpacing)
                 }.disabled(AUTHENTICATED && !score_valid)
-                Button(action: {
-                    if (!AUTHENTICATED) {
-                        showLoginPrompt = true;
-                        return;
-                    }
-                    Task.init {
-                        favorited = favorited ? await unFavoritePost(postId: post.id) : await favoritePost(postId: post.id);
-                    }
-                }) {
+                Button(action: { toggleFavorite() }) {
                     Image(systemName: favorited ? "heart.fill" : "heart")
                         .font(.title)
                         .foregroundColor(.red)
                         .padding(buttonSpacing)
                 }
-                Button(action: {
-                    if (!AUTHENTICATED) {
-                        showLoginPrompt = true;
-                        return;
-                    }
-                    Task.init {
-                        our_score = await votePost(postId: post.id, value: -1, no_unvote: false);
-                    }
-                }) {
+                Button(action: { vote(-1) }) {
                     Image(systemName: our_score == -1 ? "arrowtriangle.down.fill" : "arrowtriangle.down")
                         .font(.title)
                         .foregroundColor(!score_valid ? .gray : .orange)
                         .padding(buttonSpacing)
                 }.disabled(AUTHENTICATED && !score_valid)
             }
-            HStack() {
+            HStack(spacing: 12) {
                 Spacer().frame(width: 10)
                 Button(action: {
                     showComments = true
@@ -571,16 +821,22 @@ struct ActionBar: View {
                         .foregroundColor(.blue)
                         .padding(buttonSpacing)
                 }
+                // Slideshow play/pause. Starting opens the slideshow options
+                // sheet; the slideshow begins from its Start button.
+                Button(action: onToggleSlideshow) {
+                    Image(systemName: isSlideshowRunning ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(isSlideshowRunning ? .green : .blue)
+                        .padding(buttonSpacing)
+                }
                 Spacer()
             }
             HStack() {
                 Spacer()
-                Button(action: {
-                    Task.init {
-                        displayToastType = -1 // Show loading toast
-                        saveFile(post: post, showToast: $displayToastType);
-                    }
-                }) {
+                // Same copy/download menu as long-pressing the media.
+                Menu {
+                    MediaActionButtons(post: post, displayToastType: $displayToastType)
+                } label: {
                     Image(systemName: "square.and.arrow.down")
                         .font(.title)
                         .padding(buttonSpacing)
@@ -609,29 +865,74 @@ struct ActionBar: View {
             favorited = post.is_favorited
             AUTHENTICATED = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
         }
-        .task {
-            await fetchCurrentPostLiked();
-            await fetchCurrentPostVote();
+        .task(id: post.id) {
+            // Fresh state per post. The generation guard keeps a slow fetch
+            // from overwriting a vote/favorite the user just made.
+            let generation = stateGeneration
+            await fetchCurrentPostLiked(generation: generation);
+            await fetchCurrentPostVote(generation: generation);
+        }
+        .onChange(of: post.is_favorited) { _, newValue in
+            // The favorite state changed somewhere else (e.g. favoriting in
+            // the fullscreen viewer); follow it so this heart matches.
+            favorited = newValue
         }
     }
 
-    func fetchCurrentPostLiked() async {
+    func vote(_ value: Int) {
+        if (!AUTHENTICATED) {
+            showLoginPrompt = true;
+            return;
+        }
+        stateGeneration += 1;
+        Task.init {
+            our_score = await votePost(postId: post.id, value: value, no_unvote: false);
+            score_valid = [-1, 0, 1].contains(our_score);
+        }
+    }
+
+    func toggleFavorite() {
+        if (!AUTHENTICATED) {
+            showLoginPrompt = true;
+            return;
+        }
+        let wasFavorited = favorited;
+        stateGeneration += 1;
+        // Optimistic: show the change immediately, revert if the API
+        // rejects it.
+        favorited = !wasFavorited;
+        Task.init {
+            let success = wasFavorited
+                ? await unFavoritePost(postId: post.id)
+                : await favoritePost(postId: post.id);
+            if (!success) {
+                favorited = wasFavorited;
+            } else {
+                onFavoriteChanged?(post.id, !wasFavorited);
+            }
+        }
+    }
+
+    func fetchCurrentPostLiked(generation: Int) async {
         do {
             let url = "/posts/\(post.id).json"
-            let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
+            let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json", noCache: true);
             if (data) == nil { return; }
             let parsedData = try JSONDecoder().decode(Post.self, from: data!)
-            favorited = parsedData.post.is_favorited;
+            if (stateGeneration == generation) {
+                favorited = parsedData.post.is_favorited;
+            }
         } catch {
             print(error);
         }
     }
 
-    func fetchCurrentPostVote() async {
-        our_score = await getVote(postId: post.id);
-        print(our_score)
-        score_valid = [-1,0,1].contains(our_score);
-        print(score_valid)
+    func fetchCurrentPostVote(generation: Int) async {
+        let fetchedScore = await getVote(postId: post.id);
+        if (stateGeneration == generation) {
+            our_score = fetchedScore;
+            score_valid = [-1, 0, 1].contains(fetchedScore);
+        }
     }
 }
 
@@ -666,29 +967,51 @@ struct Tag: View {
     @State var tag: String
     @State var search: String
     @State var textColor: Color;
-    @State var isActive: Bool = false
-    
+
+    /// The two ways a tag can be opened, chosen from the tap dialog.
+    private enum TagSearch: Hashable {
+        case newSearch
+        case addToCurrent
+    }
+
+    @State private var showOptions = false
+    @State private var destination: TagSearch? = nil
+
+    /// The current query plus this tag, without a leading space when the
+    /// current search is empty.
+    private var combinedSearch: String {
+        let base = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return base.isEmpty ? tag : base + " " + tag
+    }
+
     var body: some View {
-        Menu {
-            NavigationLink(destination: SearchView(search: String(tag))) {
-                Text("New Search")
-            }
-            NavigationLink(destination: SearchView(search: String(search + " " + tag))) {
-                Text("Add to Current Search")
-            }
+        Button {
+            showOptions = true;
         } label: {
             Text(tag)
                 .font(.body)
                 .foregroundColor(textColor)
                 .multilineTextAlignment(.leading)
-        } primaryAction: {
-            isActive.toggle()
         }
-        //.background(
-        //    NavigationLink(destination: SearchView(search: String(tag)), isActive: $isActive) {}
-        //)
-        .navigationDestination(isPresented: $isActive) {
-            SearchView(search: String(tag))
+        .buttonStyle(.plain)
+        .confirmationDialog(Text(tag), isPresented: $showOptions, titleVisibility: .visible) {
+            Button("New Search") {
+                SearchHistory.record(tag);
+                destination = .newSearch;
+            }
+            Button("Add to Current Search") {
+                SearchHistory.record(combinedSearch);
+                destination = .addToCurrent;
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        .navigationDestination(item: $destination) { choice in
+            switch choice {
+            case .newSearch:
+                SearchView(search: tag)
+            case .addToCurrent:
+                SearchView(search: combinedSearch)
+            }
         }
     }
 }
