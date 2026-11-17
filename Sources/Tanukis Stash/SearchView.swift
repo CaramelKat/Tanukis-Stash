@@ -61,6 +61,8 @@ struct SearchView: View {
     @State private var AUTHENTICATED: Bool = UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     // Submitted queries, newest first, shown while the search field is empty.
     @State private var recentSearches: [String] = SearchHistory.recent;
+    // Bookmarked searches, shown alongside the recent queries.
+    @State private var savedSearches: [SavedSearch] = SavedSearches.all;
     @Environment(\.dismiss) private var dismiss;
     @Environment(\.dismissSearch) private var dismissSearch;
 
@@ -148,11 +150,28 @@ struct SearchView: View {
             }
             .task({
                 recentSearches = SearchHistory.recent;
+                savedSearches = SavedSearches.all;
                 if (posts.count == 0) {
                     await getPosts(append: false);
                 }
             })
+            // Refresh the bookmarks after returning from the Saved Searches
+            // screen (a search may have been added or deleted there).
+            .onAppear {
+                savedSearches = SavedSearches.all;
+            }
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink {
+                        SavedSearchesView(currentQuery: search) { query in
+                            runSavedSearch(query);
+                        }
+                    } label: {
+                        Image(systemName: SavedSearches.isSaved(search) ? "bookmark.fill" : "bookmark")
+                            .imageScale(.large)
+                    }
+                    .accessibilityLabel("Saved Searches")
+                }
                 if (AUTHENTICATED) {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         NavigationLink(destination: SearchView(search: String("fav:\(UserDefaults.standard.string(forKey: "username") ?? "default")"))) {
@@ -173,32 +192,43 @@ struct SearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("Posts")
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search for tags") {
-                // Remembered queries, shown before typing anything.
-                if (search.isEmpty && !recentSearches.isEmpty) {
-                    Section("Recent") {
-                        ForEach(recentSearches, id: \.self) { query in
-                            Button {
-                                runRecentSearch(query);
-                            } label: {
-                                Label(query, systemImage: "clock.arrow.circlepath");
+                // Saved and remembered queries, shown before typing anything.
+                if (search.isEmpty) {
+                    if (!savedSearches.isEmpty) {
+                        Section("Saved") {
+                            ForEach(savedSearches) { saved in
+                                Button {
+                                    runSavedSearch(saved.query);
+                                } label: {
+                                    Label(saved.name, systemImage: "bookmark.fill");
+                                }
                             }
                         }
-                        Button(role: .destructive) {
-                            clearRecentSearches();
-                        } label: {
-                            Label("Clear Recent Searches", systemImage: "trash");
+                    }
+                    if (!recentSearches.isEmpty) {
+                        Section("Recent") {
+                            ForEach(recentSearches, id: \.self) { query in
+                                Button {
+                                    runRecentSearch(query);
+                                } label: {
+                                    Label(query, systemImage: "clock.arrow.circlepath");
+                                }
+                            }
+                            Button(role: .destructive) {
+                                clearRecentSearches();
+                            } label: {
+                                Label("Clear Recent Searches", systemImage: "trash");
+                            }
                         }
                     }
                 }
-                //List {
-                    ForEach(searchSuggestions, id: \.self) { tag in
-                        Button(action: {
-                            updateSearch(tag);
-                        }) {
-                            Text(tag);
-                        }
+                ForEach(searchSuggestions, id: \.self) { tag in
+                    Button(action: {
+                        updateSearch(tag);
+                    }) {
+                        Text(tag);
                     }
-                //}
+                }
             }
             .textInputAutocapitalization(.never)
             .onChange(of: search) {
@@ -386,30 +416,53 @@ struct SearchView: View {
                 .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
                 .shadow(color: Color.black.opacity(0.2), radius: 5, y: 2)
 
-                // Recent queries (when empty) and live tag suggestions while
-                // typing, same as the main search bar.
-                if (floatingSearchFocused && (!searchSuggestions.isEmpty || (search.isEmpty && !recentSearches.isEmpty))) {
+                // Saved/recent queries (when empty) and live tag suggestions
+                // while typing, same as the main search bar.
+                if (floatingSearchFocused && (!searchSuggestions.isEmpty || (search.isEmpty && (!savedSearches.isEmpty || !recentSearches.isEmpty)))) {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
                             if (search.isEmpty) {
-                                Text("Recent")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundColor(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 14)
-                                    .padding(.top, 8)
-                                    .padding(.bottom, 2)
-                                ForEach(Array(recentSearches.prefix(10)), id: \.self) { query in
-                                    Button {
-                                        search = query;
-                                        submitFloatingSearch(proxy: proxy);
-                                    } label: {
-                                        Label(query, systemImage: "clock.arrow.circlepath")
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 9)
+                                if (!savedSearches.isEmpty) {
+                                    Text("Saved")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 14)
+                                        .padding(.top, 8)
+                                        .padding(.bottom, 2)
+                                    ForEach(Array(savedSearches.prefix(10))) { saved in
+                                        Button {
+                                            search = saved.query;
+                                            submitFloatingSearch(proxy: proxy);
+                                        } label: {
+                                            Label(saved.name, systemImage: "bookmark.fill")
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 14)
+                                                .padding(.vertical, 9)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
+                                }
+                                if (!recentSearches.isEmpty) {
+                                    Text("Recent")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 14)
+                                        .padding(.top, savedSearches.isEmpty ? 8 : 6)
+                                        .padding(.bottom, 2)
+                                    ForEach(Array(recentSearches.prefix(10)), id: \.self) { query in
+                                        Button {
+                                            search = query;
+                                            submitFloatingSearch(proxy: proxy);
+                                        } label: {
+                                            Label(query, systemImage: "clock.arrow.circlepath")
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 14)
+                                                .padding(.vertical, 9)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
                             }
                             ForEach(Array(searchSuggestions.prefix(10)), id: \.self) { tag in
@@ -472,6 +525,21 @@ struct SearchView: View {
         posts = [];
         resultCount = nil;
         recordSearch();
+        Task.init {
+            await getPosts(append: false);
+        }
+        dismissSearch();
+    }
+
+    /// Runs a bookmarked search chosen from the Saved Searches screen or the
+    /// search suggestions.
+    func runSavedSearch(_ query: String) {
+        search = query;
+        searchSuggestions.removeAll();
+        posts = [];
+        resultCount = nil;
+        recordSearch();
+        savedSearches = SavedSearches.all;
         Task.init {
             await getPosts(append: false);
         }

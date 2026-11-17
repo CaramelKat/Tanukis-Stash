@@ -316,13 +316,21 @@ final class InlinePlayerView: UIView {
         timeLabel.text = "0:00/0:00"
         timeLabel.setContentHuggingPriority(.required, for: .horizontal)
 
-        configure(btnBack, symbol: "gobackward.10")
+        configure(btnBack, symbol: "gobackward.5")
         configure(btnPlay, symbol: "play.fill", isPlay: true)
-        configure(btnFwd, symbol: "goforward.10")
+        configure(btnFwd, symbol: "goforward.5")
         configure(btnMute, symbol: "speaker.fill")
         configure(btnFull, symbol: "arrow.up.left.and.arrow.down.right")
 
+        // A flexible spacer after the time label absorbs the extra width in
+        // fullscreen. Without it the stack stretches one of the buttons (the
+        // back button) and pushes it away from play/pause.
+        let spacer = UIView()
+        spacer.setContentHuggingPriority(UILayoutPriority(rawValue: 1), for: .horizontal)
+        spacer.setContentCompressionResistancePriority(UILayoutPriority(rawValue: 1), for: .horizontal)
+
         stack.addArrangedSubview(timeLabel)
+        stack.addArrangedSubview(spacer)
         stack.addArrangedSubview(btnBack)
         stack.addArrangedSubview(btnPlay)
         stack.addArrangedSubview(btnFwd)
@@ -474,11 +482,11 @@ final class InlinePlayerView: UIView {
     }
 
     @objc private func seekBack() {
-        seek(by: -10)
+        seek(by: -5)
     }
 
     @objc private func seekFwd() {
-        seek(by: 10)
+        seek(by: 5)
     }
 
     private func seek(by seconds: Double) {
