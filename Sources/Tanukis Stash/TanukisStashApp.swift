@@ -17,6 +17,8 @@ struct TanukisStashApp: App {
     }
 
     init() {
+        // Keep video audio audible even when the ring/silent switch is on.
+        AudioSession.configure()
         // Defaults for settings read with UserDefaults.standard.bool (which
         // returns false for unset keys).
         UserDefaults.standard.register(defaults: [
