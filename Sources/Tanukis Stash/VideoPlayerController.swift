@@ -124,6 +124,10 @@ final class InlinePlayerView: UIView {
     private var loadedURL: URL?
     private var lastPlaying: Bool = false
     private var isShuttingDown = false
+    /// Target of a still-running skip seek, so a quick second tap adds another
+    /// 5 seconds instead of measuring from the pre-seek position.
+    private var pendingSeekTarget: Double?
+    private var seekGeneration = 0
 
     var videoURL: URL? {
         didSet { load() }
@@ -196,6 +200,7 @@ final class InlinePlayerView: UIView {
             // Restart from the beginning if this item already finished.
             if let duration = player.currentItem?.duration, duration.seconds.isFinite,
                player.currentTime() >= duration {
+                resetPendingSeek()
                 player.seek(to: .zero)
             }
             player.play()
@@ -206,6 +211,7 @@ final class InlinePlayerView: UIView {
     func shutdown() {
         guard !isShuttingDown else { return }
         isShuttingDown = true
+        resetPendingSeek()
         displayLink?.invalidate()
         displayLink = nil
         hideTimer?.invalidate()
@@ -219,6 +225,7 @@ final class InlinePlayerView: UIView {
     private func load() {
         guard let url = videoURL, loadedURL != url, !isShuttingDown else { return }
         loadedURL = url
+        resetPendingSeek()
         userPaused = false
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
         player.isMuted = UserDefaults.standard.bool(forKey: "VIDEO_MUTED_DEFAULT")
@@ -472,6 +479,7 @@ final class InlinePlayerView: UIView {
             let item = player.currentItem
             if let duration = item?.duration, duration.seconds.isFinite {
                 if (player.currentTime() >= duration) {
+                    resetPendingSeek()
                     player.seek(to: .zero)
                 }
             }
@@ -490,16 +498,45 @@ final class InlinePlayerView: UIView {
     }
 
     private func seek(by seconds: Double) {
-        let time = player.currentTime()
-        guard time.isNumeric, let duration = player.currentItem?.duration, duration.seconds.isFinite else { return }
-        let target = min(max(time.seconds + seconds, 0), duration.seconds)
-        player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+        let current = player.currentTime()
+        guard current.isNumeric,
+              let duration = player.currentItem?.duration,
+              duration.seconds.isFinite else { return }
+
+        // Base the jump on the target of an in-flight seek so quick repeated
+        // taps accumulate instead of both measuring from the old position.
+        let base = pendingSeekTarget ?? current.seconds
+        let target = min(max(base + seconds, 0), duration.seconds)
+        pendingSeekTarget = target
+        seekGeneration += 1
+        let generation = seekGeneration
+
+        // AVPlayer's default seek snaps to the nearest keyframe, which can be
+        // around ten seconds away (or the keyframe at the start). Zero
+        // tolerance makes the ±5s buttons land where the user expects.
+        player.seek(
+            to: CMTime(seconds: target, preferredTimescale: 600),
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        ) { [weak self] _ in
+            guard let self, self.seekGeneration == generation else { return }
+            self.pendingSeekTarget = nil
+            self.updateTimeLabel()
+        }
+
         updateTimeLabel()
         restartHideTimer()
     }
 
+    /// Drops any in-flight skip target when another action moves the playhead.
+    private func resetPendingSeek() {
+        seekGeneration += 1
+        pendingSeekTarget = nil
+    }
+
     @objc private func sliderChanged() {
         let target = Double(progressSlider.value)
+        resetPendingSeek()
         if let duration = player.currentItem?.duration, duration.seconds.isFinite, duration.seconds > 0 {
             player.seek(to: CMTime(seconds: min(max(target, 0), duration.seconds), preferredTimescale: 600))
         } else {
@@ -547,6 +584,7 @@ final class InlinePlayerView: UIView {
         onVideoEnded?()
         if (UserDefaults.standard.bool(forKey: "VIDEO_LOOP") && !isShuttingDown) {
             // Videos loop by default: restart from the beginning.
+            resetPendingSeek()
             player.seek(to: .zero)
             player.play()
             return
