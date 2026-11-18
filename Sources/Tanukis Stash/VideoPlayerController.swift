@@ -44,6 +44,34 @@ final class PlaybackRuntime: ObservableObject {
     @Published var forceVideoAutoplay = false
 }
 
+/// Ensures only one video is ever playing at a time.
+///
+/// Paging can leave an older page's player with a `play()` request still
+/// buffering while a new page starts its own video. Whenever a player begins
+/// playback, every other registered player is paused, so a scrolled-past page
+/// can never be heard over the visible one.
+@MainActor
+enum ActiveVideoRegistry {
+    private static let players = NSHashTable<AVPlayer>.weakObjects()
+
+    static func register(_ player: AVPlayer) {
+        players.add(player)
+    }
+
+    static func unregister(_ player: AVPlayer) {
+        players.remove(player)
+    }
+
+    /// Pauses all registered players except the one that is starting.
+    static func willStartPlaying(_ player: AVPlayer) {
+        for other in players.allObjects where other !== player {
+            if other.rate != 0 || other.timeControlStatus != .paused {
+                other.pause()
+            }
+        }
+    }
+}
+
 /// Remembers where a video was last playing so another copy of the player
 /// (e.g. the fullscreen viewer's) can resume from the same position.
 /// Keyed by the video file URL.
@@ -164,6 +192,7 @@ final class InlinePlayerView: UIView {
         addGestureRecognizer(tap)
 
         addTickTimer()
+        ActiveVideoRegistry.register(player)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(playbackEnded),
@@ -179,6 +208,15 @@ final class InlinePlayerView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         playerLayer.frame = bounds
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        // A page that leaves the hierarchy (paged far away, viewer dismissed,
+        // or evicted by the pager) must never keep playing audio.
+        if window == nil {
+            pauseForInactivity()
+        }
     }
 
     /// Hides the "go fullscreen" button when the player is already fullscreen,
@@ -200,10 +238,10 @@ final class InlinePlayerView: UIView {
             load()
         }
         if (!active) {
-            if (player.timeControlStatus == .playing) {
-                player.pause()
-                updatePlayState()
-            }
+            // Stop even a still-buffering `play()` request. Checking only for
+            // `.playing` here used to miss `.waitingToPlayAtSpecifiedRate`,
+            // which then began playing audio after the page was scrolled past.
+            pauseForInactivity()
         } else if ((autoPlayWhenActive && !userPaused) || forceAutoplay) && loadedURL != nil && player.timeControlStatus != .playing {
             // Restart from the beginning if this item already finished.
             if let duration = player.currentItem?.duration, duration.seconds.isFinite,
@@ -212,9 +250,18 @@ final class InlinePlayerView: UIView {
                 player.seek(to: .zero)
             }
             displayLink?.isPaused = false
+            ActiveVideoRegistry.willStartPlaying(player)
             player.play()
             updatePlayState()
         }
+    }
+
+    /// Unconditionally stops playback and any pending autoplay request.
+    private func pauseForInactivity() {
+        guard !isShuttingDown, loadedURL != nil else { return }
+        player.pause()
+        displayLink?.isPaused = true
+        updatePlayState()
     }
 
     func shutdown() {
@@ -229,6 +276,7 @@ final class InlinePlayerView: UIView {
         player.pause()
         recordPlaybackPosition()
         player.replaceCurrentItem(with: nil)
+        ActiveVideoRegistry.unregister(player)
     }
 
     private func load() {
@@ -503,6 +551,7 @@ final class InlinePlayerView: UIView {
                 }
             }
             displayLink?.isPaused = false
+            ActiveVideoRegistry.willStartPlaying(player)
             player.play()
         }
         updatePlayState()
@@ -607,6 +656,7 @@ final class InlinePlayerView: UIView {
             resetPendingSeek()
             player.seek(to: .zero)
             displayLink?.isPaused = false
+            ActiveVideoRegistry.willStartPlaying(player)
             player.play()
             return
         }

@@ -624,7 +624,10 @@ struct PostPagerView: UIViewControllerRepresentable {
 
         func evictFarPages(around index: Int) {
             let keep = Set([index - 2, index - 1, index, index + 1, index + 2].filter { $0 >= 0 && $0 < parent.posts.count })
-            for (pageIndex, _) in pages where !keep.contains(pageIndex) {
+            for (pageIndex, page) in pages where !keep.contains(pageIndex) {
+                // Stop the page before dropping our reference so a video that
+                // is still buffering cannot start playing after eviction.
+                page.rootView = makeContent(index: pageIndex, isActive: false)
                 pages.removeValue(forKey: pageIndex)
             }
         }
