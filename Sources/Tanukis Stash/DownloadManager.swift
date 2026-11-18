@@ -78,7 +78,7 @@ func downloadVideoLinkAndCreateAsset(_ videoLink: String, showToast: Binding<Int
         os_log("%{public}s %{public}s", log: .default, "Documents directory URL: \(documentsDirectoryURL)");
         os_log("%{public}s %{public}s", log: .default, "Video URL: \(videoURL)");
         os_log("%{public}s %{public}s", log: .default, "Starting download task for video");
-        URLSession.shared.downloadTask(with: videoURL) { (location, response, error) -> Void in
+        NetworkSession.shared.downloadTask(with: videoURL) { (location, response, error) -> Void in
 
         // use guard to unwrap your optional url
         guard let location = location else { 

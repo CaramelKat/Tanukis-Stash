@@ -182,7 +182,7 @@ struct FullscreenVoteBar: View {
             // vote/favorite the user just made.
             favorited = post.is_favorited
             let generation = stateGeneration
-            let fetchedFavorited = await fetchPostIsFavorited(postId: post.id)
+            let fetchedFavorited = await fetchPostIsFavorited(postId: post.id, seeded: post.is_favorited)
             if (stateGeneration == generation) {
                 favorited = fetchedFavorited
             }
@@ -239,7 +239,7 @@ struct FullscreenVoteBar: View {
 /// player controls (the player's own fullscreen button is hidden because we
 /// are already fullscreen).
 struct FullscreenMediaPage: View {
-    @State var post: PostContent;
+    var post: PostContent;
     var isActive: Bool = false;
     var onVideoEnded: (() -> Void)? = nil;
 

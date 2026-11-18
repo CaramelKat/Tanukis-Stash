@@ -199,21 +199,36 @@ struct CommentRow: View {
 }
 
 /// "2026-11-17T12:34:56.789Z" -> "Nov 17, 2026"
+nonisolated(unsafe) private let commentISOFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+}()
+
+nonisolated(unsafe) private let commentDisplayFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .none
+    return formatter
+}()
+
+nonisolated(unsafe) private let commentDateCache = NSCache<NSString, NSString>()
+
 func commentDate(_ raw: String) -> String {
+    if let cached = commentDateCache.object(forKey: raw as NSString) {
+        return cached as String
+    }
     let cleaned = raw.replacingOccurrences(
         of: #"\.\d+"#,
         with: "",
         options: .regularExpression
     )
-    let iso = ISO8601DateFormatter()
-    iso.formatOptions = [.withInternetDateTime]
-    guard let date = iso.date(from: cleaned) else {
+    guard let date = commentISOFormatter.date(from: cleaned) else {
         return datePrefix(raw)
     }
-    let display = DateFormatter()
-    display.dateStyle = .medium
-    display.timeStyle = .none
-    return display.string(from: date)
+    let result = commentDisplayFormatter.string(from: date)
+    commentDateCache.setObject(result as NSString, forKey: raw as NSString)
+    return result
 }
 
 func datePrefix(_ raw: String) -> String {

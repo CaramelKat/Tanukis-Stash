@@ -25,6 +25,8 @@ struct SettingsView: View {
     @AppStorage("VIDEO_AUTOPLAY") private var videoAutoplay: Bool = true;
     @AppStorage("VIDEO_LOOP") private var videoLoop: Bool = true;
     @AppStorage("VIDEO_MUTED_DEFAULT") private var videoStartMuted: Bool = false;
+    @State private var cacheSizeBytes: Int64? = nil;
+    @State private var showClearCacheConfirm = false;
 
     let sources = ["e926.net", "e621.net"];
 
@@ -41,20 +43,9 @@ struct SettingsView: View {
                 Section(header: Text("Account"), footer: AUTHENTICATED ? nil : Link("Get your API key here", destination: URL(string: "https://e621.net/api_keys")!).environment(\.openURL, openSettingsLink)) {
                     if (AUTHENTICATED) {
                         HStack {
-                            AsyncImage(url: URL(string: USER_ICON)) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .clipped()
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(Circle())
-                            } placeholder: {
-                                Image(systemName: "person.crop.circle.fill")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(Circle())
-                            }
+                            ThumbnailImage(urlString: USER_ICON.isEmpty ? nil : USER_ICON, maxPixelSize: 150)
+                                .frame(width: 50, height: 50)
+                                .clipShape(Circle())
                             Text(username.isEmpty ? "Username" : username)
                                 .font(.headline)
                                 .foregroundColor(.primary)
@@ -159,6 +150,34 @@ struct SettingsView: View {
                         .toggleStyle(.switch)
                 }
 
+                Section(header: Text("Storage"), footer: Text("Cached thumbnails, API responses and temporary files. Clearing frees space; anything still needed is downloaded again.")) {
+                    HStack {
+                        Text("Cached data")
+                        Spacer()
+                        if let cacheSizeBytes {
+                            Text(ByteCountFormatter.string(fromByteCount: cacheSizeBytes, countStyle: .file))
+                                .foregroundColor(.secondary)
+                        } else {
+                            ProgressView()
+                        }
+                    }
+                    Button(role: .destructive) {
+                        showClearCacheConfirm = true
+                    } label: {
+                        Label("Clear Cache & Temp Files", systemImage: "trash")
+                    }
+                    .confirmationDialog(
+                        "Clear cached images, API responses and temporary files?",
+                        isPresented: $showClearCacheConfirm,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Clear Cache", role: .destructive) {
+                            Task { await clearCache() }
+                        }
+                        Button("Cancel", role: .cancel) { }
+                    }
+                }
+
                 Section(header: Text("App Information")) {
                     HStack {
                         Text("Version")
@@ -175,7 +194,8 @@ struct SettingsView: View {
             }))
             .onAppear {
                 Task {
-                    await getUserIcon()
+                    await refreshCacheSize();
+                    await getUserIcon();
                 }
             }
             .refreshable {
@@ -189,15 +209,23 @@ struct SettingsView: View {
         }
     }
 
+    func refreshCacheSize() async {
+        let bytes = await Task.detached(priority: .utility) { AppCache.totalSize() }.value
+        cacheSizeBytes = bytes
+    }
+
+    func clearCache() async {
+        await AppCache.clear()
+        await refreshCacheSize()
+    }
+
     func getUserIcon() async {
         if let userData = await fetchUserData(),
            let avatarPostId = userData.avatar_id,
            let post = await getPost(postId: avatarPostId) {
-            if ["gif", "webm", "mp4"].contains(post.file.ext) {
-                USER_ICON = post.preview.url ?? ""
-            } else {
-                USER_ICON = post.file.url ?? post.preview.url ?? ""
-            }
+            // The preview is plenty for a 50pt circle; never download the
+            // original just for the avatar.
+            USER_ICON = post.preview.url ?? post.file.url ?? ""
         } else {
             USER_ICON = ""
         }

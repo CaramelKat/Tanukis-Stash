@@ -11,8 +11,8 @@ import AlertToast
 import AttributedText
 
 struct PostPageContent: View {
-    @State var post: PostContent;
-    @State var search: String;
+    var post: PostContent;
+    var search: String;
     @Binding var showImageViewer: Bool;
     @Binding var displayToastType: Int;
     var isActive: Bool = true;
@@ -219,11 +219,11 @@ struct PostView: View {
     }
 
     func preloadNeighbors() {
+        // Warm the next/previous post's sample image so paging feels instant.
+        // The original files are only fetched for the visible fullscreen page.
         for i in [currentIndex - 1, currentIndex + 1] {
             if (i >= 0 && i < posts.count) {
-                if let urlString = posts[i].file.url {
-                    ImageView.preload(urlString)
-                }
+                ImagePipeline.shared.prefetch(url: posts[i].sampleOrFileURL, maxPixelSize: 1400)
             }
         }
     }
@@ -914,16 +914,11 @@ struct ActionBar: View {
     }
 
     func fetchCurrentPostLiked(generation: Int) async {
-        do {
-            let url = "/posts/\(post.id).json"
-            let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json", noCache: true);
-            if (data) == nil { return; }
-            let parsedData = try JSONDecoder().decode(Post.self, from: data!)
-            if (stateGeneration == generation) {
-                favorited = parsedData.post.is_favorited;
-            }
-        } catch {
-            print(error);
+        // The post data the grid already has seeds the cache, so opening a
+        // post normally costs no request at all.
+        let value = await fetchPostIsFavorited(postId: post.id, seeded: post.is_favorited)
+        if (stateGeneration == generation) {
+            favorited = value;
         }
     }
 
@@ -1016,21 +1011,38 @@ struct Tag: View {
     }
 }
 
-// Formats a post's ISO-8601 created_at string into a human readable local date.
-func formatPostDate(_ isoDate: String) -> String {
-    let withFraction = ISO8601DateFormatter()
-    withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    let noFraction = ISO8601DateFormatter()
-    noFraction.formatOptions = [.withInternetDateTime]
+nonisolated(unsafe) private let postISOFractionFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+}()
 
-    guard let date = withFraction.date(from: isoDate) ?? noFraction.date(from: isoDate) else {
-        return isoDate
-    }
+nonisolated(unsafe) private let postISOFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+}()
 
+nonisolated(unsafe) private let postDisplayFormatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.dateStyle = .medium
     formatter.timeStyle = .short
-    return "Posted on \(formatter.string(from: date))"
+    return formatter
+}()
+
+nonisolated(unsafe) private let postDateCache = NSCache<NSString, NSString>()
+
+// Formats a post's ISO-8601 created_at string into a human readable local date.
+func formatPostDate(_ isoDate: String) -> String {
+    if let cached = postDateCache.object(forKey: isoDate as NSString) {
+        return cached as String
+    }
+    guard let date = postISOFractionFormatter.date(from: isoDate) ?? postISOFormatter.date(from: isoDate) else {
+        return isoDate
+    }
+    let result = "Posted on \(postDisplayFormatter.string(from: date))"
+    postDateCache.setObject(result as NSString, forKey: isoDate as NSString)
+    return result
 }
 
 func descParser(text: String)-> String {

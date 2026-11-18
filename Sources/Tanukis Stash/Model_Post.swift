@@ -21,6 +21,12 @@ struct PostContent: Decodable, Hashable {
         return lhs.id == rhs.id
     }
 
+    /// Identity is the post id. Without this, SwiftUI/text diffing would hash
+    /// every tag array on every grid update.
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
     let id: Int;
     let created_at: String;
     let updated_at: String;
@@ -47,6 +53,17 @@ struct PostContent: Decodable, Hashable {
 
     var isAnimated: Bool {
         return ["gif", "webm", "mp4"].contains(file.ext) || tags.general.contains("animated");
+    }
+
+    /// The medium-size file shown on screen: the server's sample when it
+    /// exists (a few megapixels at most), otherwise the original.
+    var sampleOrFileURL: URL? {
+        URL(string: sample.url ?? file.url ?? "")
+    }
+
+    /// The untouched original file, used for zooming and downloads.
+    var originalURL: URL? {
+        URL(string: file.url ?? "")
     }
 }
 

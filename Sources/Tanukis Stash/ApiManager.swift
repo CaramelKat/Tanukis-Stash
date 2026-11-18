@@ -38,29 +38,32 @@ func login() async -> Bool {
     return true;
 }
 
-func areTagsBlacklisted(blacklistedArray: [String], postTags: [String]) -> Bool {
-    for tag in blacklistedArray {
-         // Each line in the blacklist can contain multiple tags separated by spaces, if post contains all of them, it is blacklisted
-        let blacklistLineTags = tag.split(separator: " ").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-        let blacklistLineTagsSet = Set(blacklistLineTags)
-        let postTagsSet = Set(postTags.map { $0.lowercased() })
-        // Check if the post tags contain all the blacklisted tags in this line
-        if blacklistLineTagsSet.isSubset(of: postTagsSet) {
-            os_log("Post is blacklisted due to tags: %{public}s", log: .default, tag);
-            return true;
+/// Parses the multiline blacklist once per fetch instead of once per post.
+/// Each line becomes a set of tags; a post is hidden when it contains every
+/// tag on any line.
+func blacklistLineSets(_ blacklistedTags: String) -> [Set<String>] {
+    blacklistedTags
+        .lowercased()
+        .split(separator: "\n")
+        .map { line in
+            Set(line.split(separator: " ").map(String.init))
         }
-    }
-    return false
-
+        .filter { !$0.isEmpty }
 }
 
-func isPostBlacklisted(_ post: PostContent) async -> Bool {
-    let blacklistedTags = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
-    if (blacklistedTags == "No Auth" || blacklistedTags == "Bad usrdata") {
+func areTagsBlacklisted(blacklistLines: [Set<String>], postTags: [String]) -> Bool {
+    // Build the post's tag set once, not once per blacklist line.
+    let postTagsSet = Set(postTags.lazy.map { $0.lowercased() })
+    for line in blacklistLines where line.isSubset(of: postTagsSet) {
+        return true
+    }
+    return false
+}
+
+func isPostBlacklisted(_ post: PostContent, blacklistLines: [Set<String>]) -> Bool {
+    if (blacklistLines.isEmpty) {
         return false;
     }
-    // Split the blacklisted tags into an array
-    let blacklistedArray = blacklistedTags.lowercased().split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
     var allPostTags = post.tags.general
 
     allPostTags.append(contentsOf: post.tags.species)
@@ -83,7 +86,7 @@ func isPostBlacklisted(_ post: PostContent) async -> Bool {
             os_log("Unknown rating %{public}s for post %{public}d", log: .default, post.rating, post.id);
     }
 
-    return areTagsBlacklisted(blacklistedArray: blacklistedArray, postTags: allPostTags)
+    return areTagsBlacklisted(blacklistLines: blacklistLines, postTags: allPostTags)
 }
 
 func fetchUserData() async -> UserData? {
@@ -192,15 +195,15 @@ func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostC
 
         let parsedData: Posts = try JSONDecoder().decode(Posts.self, from: data!)
 
-        // If the blacklist is enabled, filter out blacklisted posts
+        // If the blacklist is enabled, filter out blacklisted posts. The
+        // blacklist is parsed once here rather than once per post.
         if (UserDefaults.standard.bool(forKey: "ENABLE_BLACKLIST")) {
-            var filteredPosts = [PostContent]()
-            for post in parsedData.posts {
-                if !(await isPostBlacklisted(post)) {
-                    filteredPosts.append(post)
-                }
+            let rawBlacklist = UserDefaults.standard.string(forKey: "USER_BLACKLIST") ?? "";
+            if (rawBlacklist == "No Auth" || rawBlacklist == "Bad usrdata") {
+                return parsedData.posts;
             }
-            return filteredPosts
+            let lineSets = blacklistLineSets(rawBlacklist);
+            return parsedData.posts.filter { !isPostBlacklisted($0, blacklistLines: lineSets) }
         }
 
         return parsedData.posts;
@@ -231,20 +234,47 @@ func fetchPostCount(search: String) async -> PostSearchCount? {
     }
 }
 
+/// In-memory favorite state per post, seeded from the post data the grid has
+/// already downloaded. Opening a post therefore no longer re-fetches the whole
+/// post JSON just to learn whether the heart is filled.
+@MainActor private var favoriteStateCache: [Int: (value: Bool, at: Date)] = [:]
+private let favoriteStateTTL: TimeInterval = 300
+
+@MainActor
+func rememberFavoriteState(postId: Int, value: Bool) {
+    favoriteStateCache[postId] = (value, Date())
+}
+
+@MainActor
+private func cachedFavoriteState(postId: Int) -> Bool? {
+    guard let cached = favoriteStateCache[postId] else { return nil }
+    if Date().timeIntervalSince(cached.at) > favoriteStateTTL {
+        favoriteStateCache[postId] = nil
+        return nil
+    }
+    return cached.value
+}
+
+@MainActor
 func favoritePost(postId: Int) async -> Bool {
     let url = "/favorites.json?post_id=\(postId)"
     let result = await makeStatusRequest(destination: url, method: "POST", body: nil, contentType: "application/json");
     guard let status = result.status else { return false; }
     // 409 = already favorited: the desired state already holds.
-    return (200..<300).contains(status) || status == 409;
+    let success = (200..<300).contains(status) || status == 409;
+    if (success) { rememberFavoriteState(postId: postId, value: true) }
+    return success;
 }
 
+@MainActor
 func unFavoritePost(postId: Int) async -> Bool {
     let url = "/favorites/\(postId).json"
     let result = await makeStatusRequest(destination: url, method: "DELETE", body: nil, contentType: "application/json");
     guard let status = result.status else { return false; }
     // 404/409 = no favorite to remove: the desired state already holds.
-    return (200..<300).contains(status) || status == 404 || status == 409;
+    let success = (200..<300).contains(status) || status == 404 || status == 409;
+    if (success) { rememberFavoriteState(postId: postId, value: false) }
+    return success;
 }
 
 /// Like makeRequest, but also reports the HTTP status code. makeRequest
@@ -258,6 +288,7 @@ func makeStatusRequest(destination: String, method: String, body: Data?, content
     guard let url = URL(string: "https://\(domain)\(destination)") else { return (nil, nil); }
 
     var request = URLRequest(url: url)
+    request.timeoutInterval = 25
     if (noCache) {
         // State fetches (favorites, votes) must not be served from the URL
         // cache, or they would report the state from before the last action.
@@ -265,6 +296,7 @@ func makeStatusRequest(destination: String, method: String, body: Data?, content
     }
     request.httpMethod = method
     request.addValue(contentType, forHTTPHeaderField: "Content-Type")
+    request.addValue(contentType, forHTTPHeaderField: "Accept")
     request.addValue(userAgent, forHTTPHeaderField: "User-Agent")
 
     if ![API_KEY, username].contains("") {
@@ -275,7 +307,7 @@ func makeStatusRequest(destination: String, method: String, body: Data?, content
         if (body != nil && method != "GET") {
             request.httpBody = body!;
         }
-        let (data, response) = try await URLSession.shared.data(for: request);
+        let (data, response) = try await NetworkSession.shared.data(for: request);
 
         os_log("HTTP %{public}s %{public}d https://%{public}s%{public}s", log: .default, method, response.getStatusCode() ?? -1, domain, destination)
         return (data, response.getStatusCode());
@@ -288,13 +320,24 @@ func makeStatusRequest(destination: String, method: String, body: Data?, content
 }
 
 /// Whether the logged-in user has favorited the given post.
+///
+/// `seeded` comes from the post data the grid already has, so opening a post
+/// is instant and normally needs no request at all. The cache is kept for a
+/// few minutes so the post page and the fullscreen viewer share one answer.
 @MainActor
-func fetchPostIsFavorited(postId: Int) async -> Bool {
+func fetchPostIsFavorited(postId: Int, seeded: Bool? = nil) async -> Bool {
+    if let cached = cachedFavoriteState(postId: postId) { return cached }
+    if let seeded {
+        rememberFavoriteState(postId: postId, value: seeded)
+        return seeded
+    }
+    guard UserDefaults.standard.bool(forKey: "AUTHENTICATED") else { return false }
     do {
         let url = "/posts/\(postId).json"
         let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json", noCache: true);
         if (data) == nil { return false; }
         let parsedData = try JSONDecoder().decode(Post.self, from: data!)
+        rememberFavoriteState(postId: postId, value: parsedData.post.is_favorited)
         return parsedData.post.is_favorited;
     } catch {
         print(error);
@@ -323,6 +366,12 @@ func fetchComments(postId: Int) async -> [CommentContent] {
 @MainActor
 func getVote(postId: Int) async -> Int {
     if let cached = ourVoteCache[postId] { return cached }
+    // Anonymous users cannot vote, so the (large) post HTML fetch would be
+    // wasted. Return the neutral state instead.
+    guard UserDefaults.standard.bool(forKey: "AUTHENTICATED") else {
+        ourVoteCache[postId] = 0
+        return 0
+    }
     let url = "/posts/\(postId)"
     let result = await makeStatusRequest(destination: url, method: "GET", body: nil, contentType: "text/html", noCache: true);
     // Only cache values from a successful fetch; a failed one (the HTML
@@ -366,7 +415,9 @@ func makeRequest(destination: String, method: String, body: Data?, contentType: 
     let AUTH_STRING: String = "\(username):\(API_KEY)".data(using: .utf8)?.base64EncodedString() ?? "";
     let url = URL(string: "https://\(domain)\(destination)")
 
-    var request = URLRequest(url: url!)
+    guard let url else { return nil }
+    var request = URLRequest(url: url)
+    request.timeoutInterval = 25
     if (noCache) {
         // State fetches (favorites, votes) must not be served from the URL
         // cache, or they would report the state from before the last action.
@@ -374,6 +425,7 @@ func makeRequest(destination: String, method: String, body: Data?, contentType: 
     }
     request.httpMethod = method
     request.addValue(contentType, forHTTPHeaderField: "Content-Type")
+    request.addValue(contentType, forHTTPHeaderField: "Accept")
     request.addValue(userAgent, forHTTPHeaderField: "User-Agent")
 
     if ![API_KEY, username].contains("") {
@@ -384,7 +436,7 @@ func makeRequest(destination: String, method: String, body: Data?, contentType: 
         if (body != nil && method != "GET") {
             request.httpBody = body!
         }
-        let (data, response) = try await URLSession.shared.data(for: request);
+        let (data, response) = try await NetworkSession.shared.data(for: request);
         
         os_log("HTTP %{public}s %{public}d https://%{public}s%{public}s", log: .default, method, response.getStatusCode() ?? -1, domain, destination)
         return data;

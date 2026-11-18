@@ -130,7 +130,7 @@ final class InlinePlayerView: UIView {
     private var seekGeneration = 0
 
     var videoURL: URL? {
-        didSet { load() }
+        didSet { if isActiveState { load() } }
     }
     var onFullscreen: (() -> Void)?
     /// Invoked when playback reaches the end of the item (slideshow support).
@@ -142,6 +142,8 @@ final class InlinePlayerView: UIView {
     /// earlier manual pause (slideshow "Wait for videos" mode).
     var forceAutoplay = false
     private var isFullscreenState = false
+    /// Whether this player's page is currently on screen.
+    private var isActiveState = false
     /// Set when the user explicitly pauses, so SwiftUI re-renders (which call
     /// setActive) do not override the pause with autoplay.
     private var userPaused = false
@@ -191,6 +193,12 @@ final class InlinePlayerView: UIView {
     }
 
     func setActive(_ active: Bool) {
+        isActiveState = active
+        if (active && loadedURL == nil) {
+            // Neighbouring pager pages no longer start downloading until they
+            // actually become visible.
+            load()
+        }
         if (!active) {
             if (player.timeControlStatus == .playing) {
                 player.pause()
@@ -203,6 +211,7 @@ final class InlinePlayerView: UIView {
                 resetPendingSeek()
                 player.seek(to: .zero)
             }
+            displayLink?.isPaused = false
             player.play()
             updatePlayState()
         }
@@ -409,6 +418,10 @@ final class InlinePlayerView: UIView {
 
     private func addTickTimer() {
         let link = CADisplayLink(target: self, selector: #selector(tick))
+        // Once per 100 ms is plenty for a time label and scrubber; the old
+        // 60 fps tick burned CPU for no visible benefit.
+        link.preferredFramesPerSecond = 10
+        link.isPaused = true
         link.add(to: .main, forMode: .common)
         displayLink = link
     }
@@ -422,6 +435,12 @@ final class InlinePlayerView: UIView {
 
     private func updatePlayState() {
         let isPlaying = player.timeControlStatus == .playing
+        // Stop the tick timer entirely while the video is paused or stopped.
+        // `.waitingToPlayAtSpecifiedRate` keeps ticking so playback start is
+        // noticed.
+        if (player.timeControlStatus == .paused) {
+            displayLink?.isPaused = true
+        }
         if (isPlaying != lastPlaying) {
             lastPlaying = isPlaying
             setSymbol(on: btnPlay, isPlaying ? "pause.fill" : "play.fill", pointSize: 30)
@@ -483,6 +502,7 @@ final class InlinePlayerView: UIView {
                     player.seek(to: .zero)
                 }
             }
+            displayLink?.isPaused = false
             player.play()
         }
         updatePlayState()
@@ -586,6 +606,7 @@ final class InlinePlayerView: UIView {
             // Videos loop by default: restart from the beginning.
             resetPendingSeek()
             player.seek(to: .zero)
+            displayLink?.isPaused = false
             player.play()
             return
         }

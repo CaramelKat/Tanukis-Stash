@@ -37,7 +37,7 @@ struct DTextView: View {
                 } else if let title = fragment.title {
                     DTextDisclosure(title: title, text: fragment.text, expanded: fragment.expanded, depth: depth + 1)
                 } else {
-                    Text(AttributedString(DTextParser.parse(fragment.text)))
+                    Text(DTextParser.styled(fragment.text))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -110,7 +110,31 @@ enum DTextParser {
         var quoteAuthor: String?
     }
 
+    private final class FragmentBox: NSObject {
+        let fragments: [Fragment]
+        init(_ fragments: [Fragment]) { self.fragments = fragments }
+    }
+
+    private final class AttributedBox: NSObject {
+        let value: AttributedString
+        init(_ value: AttributedString) { self.value = value }
+    }
+
+    // Parsing descriptions and comments is regex-heavy and used to run on
+    // every SwiftUI body evaluation. Results are memoized by source text.
+    nonisolated(unsafe) private static let fragmentCache = NSCache<NSString, FragmentBox>()
+    nonisolated(unsafe) private static let attributedCache = NSCache<NSString, NSAttributedString>()
+    nonisolated(unsafe) private static let styledCache = NSCache<NSString, AttributedBox>()
+
     static func fragments(_ text: String, depth: Int = 0) -> [Fragment] {
+        let key = "\(depth)|\(text)" as NSString
+        if let box = fragmentCache.object(forKey: key) { return box.fragments }
+        let value = computeFragments(text, depth: depth)
+        fragmentCache.setObject(FragmentBox(value), forKey: key)
+        return value
+    }
+
+    private static func computeFragments(_ text: String, depth: Int = 0) -> [Fragment] {
         guard depth < 32 else { return [Fragment(text: "", title: nil)] }
         var result: [Fragment] = []
         var remaining = text[...]
@@ -158,7 +182,27 @@ enum DTextParser {
     }
 
     static func parse(_ text: String) -> NSAttributedString {
-        inline(text.replacingOccurrences(of: "\r\n", with: "\n"), attributes: [.font: UIFont.preferredFont(forTextStyle: .body)])
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+        let font = UIFont.preferredFont(forTextStyle: .body)
+        let key = "\(font.pointSize)|\(normalized)" as NSString
+        if let cached = attributedCache.object(forKey: key) { return cached }
+
+        let value = inline(normalized, attributes: [.font: font])
+        // Freeze the mutable result before caching it.
+        let frozen = NSAttributedString(attributedString: value)
+        attributedCache.setObject(frozen, forKey: key)
+        return frozen
+    }
+
+    /// Cached `Text`-ready version of `parse`, so body updates do not bridge
+    /// the same BBCode to AttributedString again.
+    static func styled(_ text: String) -> AttributedString {
+        let font = UIFont.preferredFont(forTextStyle: .body)
+        let key = "\(font.pointSize)|\(text)" as NSString
+        if let box = styledCache.object(forKey: key) { return box.value }
+        let value = AttributedString(parse(text))
+        styledCache.setObject(AttributedBox(value), forKey: key)
+        return value
     }
 
     private static func inline(_ text: String, attributes: [NSAttributedString.Key: Any], depth: Int = 0) -> NSAttributedString {

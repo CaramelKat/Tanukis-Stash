@@ -100,9 +100,8 @@ struct SearchView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 LazyVGrid(columns: vGridLayout) {
-                    ForEach(Array(posts.enumerated()), id: \.element) { i, post in
-                        PostPreviewFrame(post: post, search: search, selectedPost: $selectedPost, index: i)
-                        .id(i)
+                    ForEach(posts.indices, id: \.self) { i in
+                        PostPreviewFrame(post: posts[i], search: search, selectedPost: $selectedPost, index: i)
                         .onAppear {
                             if (i == posts.count - 9) {
                                 Task.init {
@@ -231,14 +230,26 @@ struct SearchView: View {
                 }
             }
             .textInputAutocapitalization(.never)
-            .onChange(of: search) {
-                Task.init { 
-                    if(search.count >= 3) {
-                        Task.init {
-                            searchSuggestions = await createTagList(search);
-                        }
-                    } 
-               }
+            // Debounce tag suggestions: one request per pause instead of one
+            // per keystroke, and the previous request is cancelled when the
+            // text changes again.
+            .task(id: search) {
+                let query = search;
+                guard query.count >= 3 else {
+                    if (!searchSuggestions.isEmpty) {
+                        searchSuggestions.removeAll();
+                    }
+                    return;
+                }
+                do {
+                    try await Task.sleep(for: .milliseconds(300));
+                } catch {
+                    return;
+                }
+                guard !Task.isCancelled else { return; }
+                let suggestions = await createTagList(query);
+                guard !Task.isCancelled else { return; }
+                searchSuggestions = suggestions;
             }
             .onSubmit(of: .search) {
                 posts = [];
@@ -616,8 +627,8 @@ struct PostSelection: Identifiable, Equatable {
 }
 
 struct PostPreviewFrame: View {
-    @State var post: PostContent;
-    @State var search: String;
+    var post: PostContent;
+    var search: String;
     @Binding var selectedPost: PostSelection?;
     var index: Int;
     
@@ -626,19 +637,9 @@ struct PostPreviewFrame: View {
         Button(action: { selectedPost = PostSelection(index: index) }) {
             ZStack {
                 if(post.preview.url != nil) {
-                    AsyncImage(url: URL(string: post.preview.url!)) { image in
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .clipped()
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .frame(height: 150)
-                            .shadow(color: Color.primary.opacity(0.3), radius: 1)
-                    } placeholder: {
-                        ProgressView()
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .frame(width: 100, height: 150)
-                    }
+                    ThumbnailImage(urlString: post.preview.url, maxPixelSize: 400)
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                        .frame(height: 150)
                 }
                 else {
                     Text("Deleted")

@@ -36,10 +36,10 @@ struct SnowfallView: View {
         }
     }
 
-    private let flakes: [Flake] = (0..<48).map { _ in .random() }
+    private let flakes: [Flake] = (0..<32).map { _ in .random() }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 20.0)) { timeline in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
 
