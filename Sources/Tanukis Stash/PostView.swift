@@ -712,7 +712,7 @@ struct RelatedPostsView: View {
 
     func fetchParentPostData(postID: Int) async {
         do {
-            let url = "/posts/\(postID).json?v1=true"
+            let url = "/posts/\(postID).json?v2=true&mode=extended"
             let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
             if (data) == nil { return; }
             let parsedData = try JSONDecoder().decode(Post.self, from: data!)

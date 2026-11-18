@@ -189,10 +189,9 @@ func createTagList(_ search: String) async -> [String] {
 }
 
 func getPost(postId: Int) async -> PostContent? {
-    // v1=true keeps the legacy response shape. On 2026-11-18 e621/e926 made
-    // the new v2 format (bare objects, regrouped fields, flat tags) the
-    // default; the legacy format remains available until roughly May 2027.
-    let url = "/posts/\(postId).json?v1=true"
+    // v2 is the default response format since 2026-11-18. mode=extended keeps
+    // tags grouped by category, which the app uses for colours and filtering.
+    let url = "/posts/\(postId).json?v2=true&mode=extended"
     do {
         let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
         if (data) == nil { return nil; }
@@ -211,13 +210,12 @@ func fetchRecentPosts(_ page: Int, _ limit: Int, _ tags: String) async -> [PostC
         let encoded = tags.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
         let url: String;
 
-        // v1=true asks for the legacy response shape. The API switched its
-        // default to v2 on 2026-11-18 (bare arrays, regrouped fields and flat
-        // tags), which the app's models do not understand yet.
+        // v2 is the default response format since 2026-11-18. mode=extended
+        // keeps tags grouped by category instead of returning a flat list.
         if (tags == "fav:\(username)") {
-            url = "/favorites.json?v1=true&limit=\(limit)&page=\(page)"
+            url = "/favorites.json?v2=true&mode=extended&limit=\(limit)&page=\(page)"
         } else {
-            url = "/posts.json?v1=true&tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
+            url = "/posts.json?v2=true&mode=extended&tags=\(encoded ?? "")&limit=\(limit)&page=\(page)"
         }
 
         let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
@@ -367,7 +365,7 @@ func fetchPostIsFavorited(postId: Int, seeded: Bool? = nil) async -> Bool {
     }
     guard UserDefaults.standard.bool(forKey: "AUTHENTICATED") else { return false }
     do {
-        let url = "/posts/\(postId).json?v1=true"
+        let url = "/posts/\(postId).json?v2=true&mode=extended"
         let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json", noCache: true);
         if (data) == nil { return false; }
         let parsedData = try JSONDecoder().decode(Post.self, from: data!)
