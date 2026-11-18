@@ -1,11 +1,43 @@
 import SwiftUI
 
+/// Response of GET /posts.json.
+///
+/// The API returned `{"posts": [...]}` when this app was written. On
+/// 2026-11-18 the default changed to a bare `[...]` array (v2). Requests now
+/// ask for `v1=true`, but decoding both shapes keeps cached responses and any
+/// future server-side change from turning into "No posts found".
 struct Posts: Decodable {
     let posts: [PostContent]
+
+    private enum CodingKeys: String, CodingKey { case posts }
+
+    init(from decoder: Decoder) throws {
+        if let container = try? decoder.singleValueContainer(),
+           let posts = try? container.decode([PostContent].self) {
+            self.posts = posts
+            return
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.posts = try container.decode([PostContent].self, forKey: .posts)
+    }
 }
 
+/// Response of GET /posts/<id>.json. Accepts both the legacy `{"post": {...}}`
+/// envelope and the bare object used by the v2 format.
 struct Post: Decodable {
     let post: PostContent;
+
+    private enum CodingKeys: String, CodingKey { case post }
+
+    init(from decoder: Decoder) throws {
+        if let container = try? decoder.singleValueContainer(),
+           let post = try? container.decode(PostContent.self) {
+            self.post = post
+            return
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.post = try container.decode(PostContent.self, forKey: .post)
+    }
 }
 
 // Response of GET /posts/count.json — the precise number of posts matching a
