@@ -29,13 +29,40 @@ func login() async -> Bool {
     if username.isEmpty || API_KEY.isEmpty {
         return false;
     }
-    let testFavorites = await fetchRecentPosts(1, 1, "fav:\(username)");
-    if testFavorites.isEmpty {
-        os_log("Login failed for %{public}s", log: .default, username);
-        return false;
+
+    // Verify the API key itself instead of looking at the favorites list.
+    // The favorites check reported failure for accounts with no favorites,
+    // accounts with favorites hidden, and whenever the single fetched
+    // favorite happened to match the saved blacklist.
+    //
+    // `/users/<name>.json` returns 200 for valid credentials, 401 for a bad
+    // username key pair and 404 when the user does not exist.
+    let encodedName = username.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? username
+    let result = await makeStatusRequest(
+        destination: "/users/\(encodedName).json",
+        method: "GET",
+        body: nil,
+        contentType: "application/json",
+        noCache: true
+    )
+
+    if let status = result.status {
+        if (200..<300).contains(status) {
+            os_log("Login successful for %{public}s", log: .default, username);
+            return true;
+        }
+        if (status == 401 || status == 403 || status == 404) {
+            os_log("Login failed for %{public}s (HTTP %{public}d)", log: .default, username, status);
+            return false;
+        }
+        os_log("Login check got HTTP %{public}d for %{public}s; keeping current state", log: .default, status, username);
+        return UserDefaults.standard.bool(forKey: "AUTHENTICATED");
     }
-    os_log("Login successful for %{public}s", log: .default, username);
-    return true;
+
+    // Could not reach the server at all. Do not log the user out because of a
+    // transient network failure.
+    os_log("Login check could not reach the server for %{public}s", log: .default, username);
+    return UserDefaults.standard.bool(forKey: "AUTHENTICATED");
 }
 
 /// Parses the multiline blacklist once per fetch instead of once per post.
@@ -91,7 +118,8 @@ func isPostBlacklisted(_ post: PostContent, blacklistLines: [Set<String>]) -> Bo
 
 func fetchUserData() async -> UserData? {
     let username = UserDefaults.standard.string(forKey: "username") ?? "";
-    let url = "/users/\(username).json"
+    let encodedName = username.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? username
+    let url = "/users/\(encodedName).json"
     do {
         let data = await makeRequest(destination: url, method: "GET", body: nil, contentType: "application/json");
         if (data) == nil { return nil; }
