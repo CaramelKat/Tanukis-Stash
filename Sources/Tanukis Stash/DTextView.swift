@@ -30,10 +30,14 @@ struct DTextView: View {
                             }
                         }
                     }
+                } else if fragment.quote {
+                    DTextQuote(author: fragment.quoteAuthor) {
+                        DTextView(text: fragment.text, depth: depth + 1)
+                    }
                 } else if let title = fragment.title {
                     DTextDisclosure(title: title, text: fragment.text, expanded: fragment.expanded, depth: depth + 1)
                 } else {
-                    Text(AttributedString(DTextParser.parse(fragment.text)))
+                    Text(DTextParser.styled(fragment.text))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -62,19 +66,79 @@ private struct DTextDisclosure: View {
     }
 }
 
+/// A quoted block lifted out of the surrounding text, with an accent bar and
+/// a tinted panel so quotes are easy to tell apart from the reply itself.
+private struct DTextQuote<Content: View>: View {
+    let author: String?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.accentColor.opacity(0.8))
+                .frame(width: 3)
+            VStack(alignment: .leading, spacing: 5) {
+                if let author, !author.isEmpty {
+                    Label("Quoted \(author)", systemImage: "quote.opening")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                }
+                content
+            }
+            .padding(.leading, 10)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.secondary.opacity(0.18))
+        )
+    }
+}
+
 enum DTextParser {
     struct Fragment {
         let text: String
         let title: String?
         var expanded: Bool = false
         var rows: [[String]]?
+        /// True when this fragment came from a `[quote]` block, so the view
+        /// can draw it as a separate quote panel.
+        var quote: Bool = false
+        var quoteAuthor: String?
     }
 
+    private final class FragmentBox: NSObject {
+        let fragments: [Fragment]
+        init(_ fragments: [Fragment]) { self.fragments = fragments }
+    }
+
+    private final class AttributedBox: NSObject {
+        let value: AttributedString
+        init(_ value: AttributedString) { self.value = value }
+    }
+
+    // Parsing descriptions and comments is regex-heavy and used to run on
+    // every SwiftUI body evaluation. Results are memoized by source text.
+    nonisolated(unsafe) private static let fragmentCache = NSCache<NSString, FragmentBox>()
+    nonisolated(unsafe) private static let attributedCache = NSCache<NSString, NSAttributedString>()
+    nonisolated(unsafe) private static let styledCache = NSCache<NSString, AttributedBox>()
+
     static func fragments(_ text: String, depth: Int = 0) -> [Fragment] {
+        let key = "\(depth)|\(text)" as NSString
+        if let box = fragmentCache.object(forKey: key) { return box.fragments }
+        let value = computeFragments(text, depth: depth)
+        fragmentCache.setObject(FragmentBox(value), forKey: key)
+        return value
+    }
+
+    private static func computeFragments(_ text: String, depth: Int = 0) -> [Fragment] {
         guard depth < 32 else { return [Fragment(text: "", title: nil)] }
         var result: [Fragment] = []
         var remaining = text[...]
-        let pattern = #"\[(spoiler|section|table|ltable)(?:,expanded)?(?:=([^\]]*))?\]|\[code\]|`"#
+        let pattern = #"\[(spoiler|section|table|ltable|quote)(?:,expanded)?(?:=([^\]]*))?\]|\[code\]|`"#
         var cursor = remaining.startIndex
         while let opening = remaining.range(of: pattern, options: .regularExpression, range: cursor..<remaining.endIndex) {
             if remaining[opening] == "`" {
@@ -104,6 +168,9 @@ enum DTextParser {
             if tag == "table" || tag == "ltable" {
                 let rows = tableRows(content, pipeSeparated: tag == "ltable")
                 result.append(Fragment(text: rows.isEmpty ? String(remaining[opening.lowerBound..<closing.upperBound]) : content, title: nil, rows: rows.isEmpty ? nil : rows))
+            } else if tag == "quote" {
+                let author = parts.count == 2 && !parts[1].isEmpty ? String(parts[1]) : nil
+                result.append(Fragment(text: content, title: nil, quote: true, quoteAuthor: author))
             } else {
                 result.append(Fragment(text: content, title: title, expanded: parts[0].hasSuffix(",expanded")))
             }
@@ -115,7 +182,27 @@ enum DTextParser {
     }
 
     static func parse(_ text: String) -> NSAttributedString {
-        inline(text.replacingOccurrences(of: "\r\n", with: "\n"), attributes: [.font: UIFont.preferredFont(forTextStyle: .body)])
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+        let font = UIFont.preferredFont(forTextStyle: .body)
+        let key = "\(font.pointSize)|\(normalized)" as NSString
+        if let cached = attributedCache.object(forKey: key) { return cached }
+
+        let value = inline(normalized, attributes: [.font: font])
+        // Freeze the mutable result before caching it.
+        let frozen = NSAttributedString(attributedString: value)
+        attributedCache.setObject(frozen, forKey: key)
+        return frozen
+    }
+
+    /// Cached `Text`-ready version of `parse`, so body updates do not bridge
+    /// the same BBCode to AttributedString again.
+    static func styled(_ text: String) -> AttributedString {
+        let font = UIFont.preferredFont(forTextStyle: .body)
+        let key = "\(font.pointSize)|\(text)" as NSString
+        if let box = styledCache.object(forKey: key) { return box.value }
+        let value = AttributedString(parse(text))
+        styledCache.setObject(AttributedBox(value), forKey: key)
+        return value
     }
 
     private static func inline(_ text: String, attributes: [NSAttributedString.Key: Any], depth: Int = 0) -> NSAttributedString {

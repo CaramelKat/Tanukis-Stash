@@ -21,7 +21,8 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            SearchView(search: "", isTopView: true)
+            // Open on the last submitted query (empty means the default feed).
+            SearchView(search: SearchHistory.lastSearch, isTopView: true)
         }
     }
 }
