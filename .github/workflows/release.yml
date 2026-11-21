@@ -1,18 +1,22 @@
-name: Release iOS app
+name: Build iOS app
 
 on:
+  pull_request:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Install xtool
         run: |
@@ -22,15 +26,16 @@ jobs:
       - name: Install iOS SDK
         run: xtool sdk install /Applications/Xcode.app --slim
 
-      - name: Set app version from tag
+      - name: Compute next version
+        id: version
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Expected a tag like v1.2.3, got $GITHUB_REF_NAME" >&2
-            exit 1
-          fi
+          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n 1)
+          latest=${latest:-v0.0.0}
+          IFS=. read -r major minor patch <<< "${latest#v}"
+          version="$major.$minor.$((patch + 1))"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           plutil -replace CFBundleShortVersionString -string "$version" Resources/Info.xml
-          test "$(plutil -extract CFBundleShortVersionString raw -o - Resources/Info.xml)" = "$version"
+          plutil -replace CFBundleVersion -string "$GITHUB_RUN_NUMBER" Resources/Info.xml
 
       - name: Build unsigned release IPA
         run: xtool dev build --configuration release --ipa
@@ -43,10 +48,10 @@ jobs:
           cp "$ipa" dist/Tanukis-Stash-unsigned.ipa
 
       - name: Publish release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
-          fi
-          gh release upload "$GITHUB_REF_NAME" dist/Tanukis-Stash-unsigned.ipa --clobber
+          tag="v${{ steps.version.outputs.version }}"
+          gh release create "$tag" dist/Tanukis-Stash-unsigned.ipa \
+            --target "$GITHUB_SHA" --generate-notes
