@@ -588,9 +588,11 @@ final class InlinePlayerView: UIView {
             toleranceBefore: .zero,
             toleranceAfter: .zero
         ) { [weak self] _ in
-            guard let self, self.seekGeneration == generation else { return }
-            self.pendingSeekTarget = nil
-            self.updateTimeLabel()
+            Task { @MainActor in
+                guard let self, self.seekGeneration == generation else { return }
+                self.pendingSeekTarget = nil
+                self.updateTimeLabel()
+            }
         }
 
         updateTimeLabel()
